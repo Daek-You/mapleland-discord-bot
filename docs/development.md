@@ -72,6 +72,19 @@ Alternative (simple mode):
 
 ---
 
+### Pull Request Guide
+
+Write Pull Request titles and descriptions in Korean.
+
+Include these items in the Pull Request description:
+
+* Summary of changes
+* Verification commands and results
+* Manual verification results, if the feature needs real service integration
+* Notes about secrets or environment variables, without exposing real values
+
+---
+
 ## 4. Commit Convention
 
 * feat: new feature
