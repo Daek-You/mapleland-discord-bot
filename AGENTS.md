@@ -54,6 +54,8 @@ Rules:
 * Do NOT rewrite entire files unless asked
 * Reuse existing code
 * Do NOT duplicate logic
+* Avoid hardcoded magic numbers and configuration values
+* Store configurable values in a dedicated config module and read runtime values from environment variables
 
 ---
 
