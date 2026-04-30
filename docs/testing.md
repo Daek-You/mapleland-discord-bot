@@ -49,6 +49,12 @@ docker compose run --rm app
 
 This command runs `uv run pytest -p no:cacheprovider` in the container, using the same Python and dependencies as the Docker development environment.
 
+This verifies automated tests only. For Discord commands such as `/ping`, also run the bot with a real local `.env` token and confirm the command in a Discord test server.
+
+```powershell
+docker compose run --rm app uv run python -m app.main
+```
+
 ---
 
 ## 6. Example Test Structure
