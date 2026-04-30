@@ -128,6 +128,8 @@ Rules:
 * Use type hints
 * Avoid abbreviations
 * Write self-explanatory code
+* Save all text files as UTF-8
+* Use UTF-8 explicitly when reading or writing files in scripts or terminal commands
 
 ---
 
