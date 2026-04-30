@@ -5,6 +5,7 @@ import os
 import discord
 from discord import app_commands
 
+from app.bot.notice import register_notice_command
 from app.bot.ping import register_ping_command
 
 
@@ -17,6 +18,7 @@ class MapleLandDiscordClient(discord.Client):
 
     async def setup_hook(self) -> None:
         """Register and sync slash commands."""
+        register_notice_command(self.command_tree)
         register_ping_command(self.command_tree)
 
         guild_id = os.getenv("DISCORD_GUILD_ID")
