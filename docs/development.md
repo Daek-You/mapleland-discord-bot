@@ -71,6 +71,7 @@ Alternative (simple mode):
 * refactor: code improvement
 * test: test code
 * docs: documentation
+* chore: build, tooling, or maintenance work
 
 Example:
 
@@ -78,6 +79,25 @@ Example:
 feat: add notice crawler
 fix: prevent duplicate notifications
 ```
+
+## 4.1 Commit Workflow
+
+After developing or modifying a feature, run the required Docker test command before committing:
+
+```powershell
+docker compose run --rm app
+```
+
+If the tests pass, create a commit for that small feature or fix.
+
+Rules:
+
+* Keep commits scoped to one small feature, bug fix, or maintenance change
+* Do NOT mix unrelated changes in the same commit
+* Do NOT commit changes before the required tests pass
+* Use the commit convention above for every commit
+* Leave unrelated working tree changes unstaged
+* Mention important verification results when summarizing the commit
 
 ---
 
