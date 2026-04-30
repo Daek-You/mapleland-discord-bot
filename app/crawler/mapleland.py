@@ -6,10 +6,11 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-
-MAPLELAND_NOTICE_LIST_URL = "https://maple.land/board/notices"
-MAPLELAND_NOTICE_PATH_PREFIX = "/board/notices/"
-DEFAULT_REQUEST_TIMEOUT_SECONDS = 10.0
+from app.config import (
+    DEFAULT_MAPLELAND_REQUEST_TIMEOUT_SECONDS,
+    MAPLELAND_NOTICE_LIST_URL,
+    MAPLELAND_NOTICE_PATH_PREFIX,
+)
 
 
 class MaplelandCrawlerError(RuntimeError):
@@ -30,7 +31,9 @@ def fetch_latest_notice_items(
 ) -> list[NoticeItem]:
     """Fetch latest Mapleland notice titles and URLs."""
     if client is None:
-        with httpx.Client(timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS) as default_client:
+        with httpx.Client(
+            timeout=DEFAULT_MAPLELAND_REQUEST_TIMEOUT_SECONDS
+        ) as default_client:
             return _fetch_latest_notice_items_with_client(default_client, notice_list_url)
 
     return _fetch_latest_notice_items_with_client(client, notice_list_url)

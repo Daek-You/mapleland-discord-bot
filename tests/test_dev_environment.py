@@ -21,3 +21,6 @@ def test_docker_configuration_uses_python_311_slim_and_uv() -> None:
     assert "UV_PROJECT_ENVIRONMENT=/opt/venv" in dockerfile
     assert "uv sync --dev" in dockerfile
     assert "uv run pytest" in compose_file
+    assert "NOTICE_CHANNEL_ID" in compose_file
+    assert "NOTICE_CHECK_INTERVAL_SECONDS" in compose_file
+    assert "NOTICE_DATABASE_PATH" in compose_file

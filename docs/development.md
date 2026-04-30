@@ -87,6 +87,8 @@ Include these items in the Pull Request description:
 
 ## 4. Commit Convention
 
+Use the existing commit type prefixes, but write the commit summary in Korean.
+
 * feat: new feature
 * fix: bug fix
 * refactor: code improvement
@@ -97,8 +99,8 @@ Include these items in the Pull Request description:
 Example:
 
 ```text
-feat: add notice crawler
-fix: prevent duplicate notifications
+feat: 공지 크롤러 추가
+fix: 중복 알림 방지
 ```
 
 ## 4.1 Commit Workflow
@@ -175,6 +177,8 @@ tmp()
 
 * Do NOT hardcode Discord slash command names or descriptions inside command handlers
 * Define slash command metadata in a dedicated bot configuration module
+* Do NOT hardcode magic numbers or runtime configuration values in feature code
+* Define configurable defaults and environment variable names in a dedicated config module
 * Command handlers should read metadata from configuration and keep only Discord input/output logic
 * Use service-layer formatter functions for Discord message templates
 * Prefer simple Discord Markdown templates for text responses
