@@ -1,5 +1,6 @@
 import asyncio
 
+from app.bot.command_config import PING_COMMAND
 from app.bot.ping import register_ping_command
 
 
@@ -36,8 +37,8 @@ def test_register_ping_command_registers_ping() -> None:
 
     register_ping_command(command_tree)
 
-    assert "ping" in command_tree.commands
-    assert command_tree.commands["ping"]["description"]
+    assert PING_COMMAND.name in command_tree.commands
+    assert command_tree.commands[PING_COMMAND.name]["description"] == PING_COMMAND.description
 
 
 def test_ping_command_sends_pong() -> None:
@@ -45,6 +46,6 @@ def test_ping_command_sends_pong() -> None:
     interaction = FakeInteraction()
     register_ping_command(command_tree)
 
-    asyncio.run(command_tree.commands["ping"]["callback"](interaction))
+    asyncio.run(command_tree.commands[PING_COMMAND.name]["callback"](interaction))
 
     assert interaction.response.message == "Pong!"

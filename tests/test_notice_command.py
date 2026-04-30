@@ -1,6 +1,7 @@
 import asyncio
 
 import app.bot.notice as notice_command
+from app.bot.command_config import NOTICE_COMMAND
 from app.bot.notice import register_notice_command
 
 
@@ -37,8 +38,8 @@ def test_register_notice_command_registers_notice() -> None:
 
     register_notice_command(command_tree)
 
-    assert "공지" in command_tree.commands
-    assert command_tree.commands["공지"]["description"]
+    assert NOTICE_COMMAND.name in command_tree.commands
+    assert command_tree.commands[NOTICE_COMMAND.name]["description"] == NOTICE_COMMAND.description
 
 
 def test_notice_command_sends_latest_notice_message(monkeypatch) -> None:
@@ -47,6 +48,6 @@ def test_notice_command_sends_latest_notice_message(monkeypatch) -> None:
     monkeypatch.setattr(notice_command, "get_latest_notice_message", lambda: "공지 응답")
 
     register_notice_command(command_tree)
-    asyncio.run(command_tree.commands["공지"]["callback"](interaction))
+    asyncio.run(command_tree.commands[NOTICE_COMMAND.name]["callback"](interaction))
 
     assert interaction.response.message == "공지 응답"
