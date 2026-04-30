@@ -6,6 +6,7 @@ import logging
 import discord
 from discord import app_commands
 
+from app.bot.monster import register_monster_command
 from app.bot.notification_test import register_notification_test_command
 from app.bot.notice import register_notice_command
 from app.bot.ping import register_ping_command
@@ -35,6 +36,7 @@ class MapleLandDiscordClient(discord.Client):
 
     async def setup_hook(self) -> None:
         """Register and sync slash commands."""
+        register_monster_command(self.command_tree)
         register_notification_test_command(self.command_tree)
         register_notice_command(self.command_tree)
         register_ping_command(self.command_tree)
