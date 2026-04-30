@@ -8,7 +8,9 @@ from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem, fetch_lates
 
 NOTICE_COMMAND_EMPTY_MESSAGE = "현재 가져올 수 있는 공지가 없습니다."
 NOTICE_COMMAND_FAILURE_MESSAGE = "공지사항을 가져오는 데 실패했습니다. 잠시 후 다시 시도해주세요."
+NOTICE_COMMAND_HEADER = "**📢 최신 메이플랜드 공지**"
 DEFAULT_NOTICE_DISPLAY_LIMIT = 5
+MARKDOWN_LINK_TEXT_SPECIAL_CHARACTERS = "\\[]"
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +30,19 @@ def get_latest_notice_message(
 
 
 def format_notice_items(notice_items: list[NoticeItem]) -> str:
-    """Format notice items as a numbered Discord message."""
+    """Format notice items as a Markdown numbered Discord message."""
     if not notice_items:
         return NOTICE_COMMAND_EMPTY_MESSAGE
 
-    return "\n".join(
-        f"{index}. {notice_item.title}\n{notice_item.url}"
+    notice_lines = "\n".join(
+        f"{index}. [{_escape_markdown_link_text(notice_item.title)}]({notice_item.url})"
         for index, notice_item in enumerate(notice_items, start=1)
+    )
+    return f"{NOTICE_COMMAND_HEADER}\n\n{notice_lines}"
+
+
+def _escape_markdown_link_text(text: str) -> str:
+    return "".join(
+        f"\\{character}" if character in MARKDOWN_LINK_TEXT_SPECIAL_CHARACTERS else character
+        for character in text
     )

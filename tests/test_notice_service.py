@@ -4,23 +4,31 @@ from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem
 from app.services.notice_service import (
     NOTICE_COMMAND_EMPTY_MESSAGE,
     NOTICE_COMMAND_FAILURE_MESSAGE,
+    NOTICE_COMMAND_HEADER,
     format_notice_items,
     get_latest_notice_message,
 )
 
 
-def test_format_notice_items_returns_numbered_title_and_url_list() -> None:
+def test_format_notice_items_returns_markdown_notice_list() -> None:
     notice_items = [
         NoticeItem(title="첫 번째 공지", url="https://maple.land/board/notices/first"),
         NoticeItem(title="두 번째 공지", url="https://maple.land/board/notices/second"),
     ]
 
     assert format_notice_items(notice_items) == (
-        "1. 첫 번째 공지\n"
-        "https://maple.land/board/notices/first\n"
-        "2. 두 번째 공지\n"
-        "https://maple.land/board/notices/second"
+        f"{NOTICE_COMMAND_HEADER}\n\n"
+        "1. [첫 번째 공지](https://maple.land/board/notices/first)\n"
+        "2. [두 번째 공지](https://maple.land/board/notices/second)"
     )
+
+
+def test_format_notice_items_escapes_markdown_link_text() -> None:
+    notice_items = [
+        NoticeItem(title="[긴급] 공지", url="https://maple.land/board/notices/urgent"),
+    ]
+
+    assert "\\[긴급\\] 공지" in format_notice_items(notice_items)
 
 
 def test_format_notice_items_returns_empty_message() -> None:
@@ -35,7 +43,7 @@ def test_get_latest_notice_message_limits_notices_to_five() -> None:
 
     message = get_latest_notice_message(lambda: notice_items)
 
-    assert "5. 공지 5" in message
+    assert "5. [공지 5](https://maple.land/board/notices/5)" in message
     assert "공지 6" not in message
 
 
