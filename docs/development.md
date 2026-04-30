@@ -176,3 +176,7 @@ tmp()
 * Do NOT hardcode Discord slash command names or descriptions inside command handlers
 * Define slash command metadata in a dedicated bot configuration module
 * Command handlers should read metadata from configuration and keep only Discord input/output logic
+* Use service-layer formatter functions for Discord message templates
+* Prefer simple Discord Markdown templates for text responses
+* Use `[title](url)` links instead of exposing long raw URLs when listing resources
+* Consider Discord embeds only when a message needs richer structure than Markdown can provide
