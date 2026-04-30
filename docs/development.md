@@ -168,3 +168,11 @@ tmp()
 * Small changes over big rewrites
 * Stability over speed
 * Code is maintained longer than written
+
+---
+
+## 9. Configuration Rules
+
+* Do NOT hardcode Discord slash command names or descriptions inside command handlers
+* Define slash command metadata in a dedicated bot configuration module
+* Command handlers should read metadata from configuration and keep only Discord input/output logic
