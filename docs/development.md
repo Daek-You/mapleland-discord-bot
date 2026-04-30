@@ -18,9 +18,38 @@
 1. Create branch from develop
 2. Implement feature
 3. Write tests
-4. Run tests
-5. Open Pull Request
-6. Merge after review
+4. Build the Docker image
+5. Run tests in Docker
+6. Open Pull Request
+7. Merge after review
+
+### Docker Development Workflow
+
+Use Docker for local development so the project works even when Python is not installed on the host machine.
+
+Build the development image:
+
+```powershell
+docker compose build app
+```
+
+Run the default test command:
+
+```powershell
+docker compose run --rm app
+```
+
+Run a specific command inside the container:
+
+```powershell
+docker compose run --rm app uv run pytest
+```
+
+After changing dependencies in `pyproject.toml`, rebuild the image:
+
+```powershell
+docker compose build --no-cache app
+```
 
 ---
 

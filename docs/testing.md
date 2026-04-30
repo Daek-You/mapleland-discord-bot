@@ -10,6 +10,7 @@
 ## 2. Testing Tool
 
 * pytest
+* Run pytest inside Docker with `docker compose run --rm app`
 
 ---
 
@@ -38,6 +39,15 @@ Design → Test → Implement → Verify → Refactor → Test Again
 * Do NOT skip tests
 * Do NOT delete failing tests
 * Fix code, not tests
+* After feature development or bug fixes, run the full Docker test command
+
+### Required Verification Command
+
+```powershell
+docker compose run --rm app
+```
+
+This command runs `uv run pytest -p no:cacheprovider` in the container, using the same Python and dependencies as the Docker development environment.
 
 ---
 

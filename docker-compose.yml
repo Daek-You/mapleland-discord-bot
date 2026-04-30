@@ -1,0 +1,6 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+    command: uv run pytest -p no:cacheprovider
