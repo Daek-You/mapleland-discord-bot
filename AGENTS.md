@@ -82,3 +82,10 @@ Rules:
 ## 9. Goal
 
 Build a clean, maintainable, and scalable system.
+
+## 10. Security Rules
+
+- Do NOT hardcode secrets (tokens, API keys)
+- Always use environment variables
+- Do NOT print or log sensitive values
+- Assume secrets are stored in .env

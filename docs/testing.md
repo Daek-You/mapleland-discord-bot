@@ -68,6 +68,13 @@ def test_fetch_notices():
 
 ---
 
+## Commit After Verification
+
+* Commit only after the required Docker test command passes
+* Keep each commit focused on a small feature or fix
+
+---
+
 ## 8. Goal
 
 Ensure reliability and prevent regressions.
