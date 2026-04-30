@@ -1,6 +1,9 @@
 services:
   app:
     build: .
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
     volumes:
       - .:/app
     command: uv run pytest -p no:cacheprovider

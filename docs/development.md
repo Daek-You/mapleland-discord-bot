@@ -45,6 +45,14 @@ Run a specific command inside the container:
 docker compose run --rm app uv run pytest
 ```
 
+Run the Discord bot after setting `.env`:
+
+```powershell
+docker compose run --rm app uv run python -m app.main
+```
+
+For local slash command testing, set `DISCORD_GUILD_ID` in `.env` so commands sync to one test server immediately.
+
 After changing dependencies in `pyproject.toml`, rebuild the image:
 
 ```powershell
