@@ -55,6 +55,23 @@ This verifies automated tests only. For Discord commands such as `/ping`, also r
 docker compose run --rm app uv run python -m app.main
 ```
 
+### Reporting Test Results
+
+When reporting test results, include enough detail for reviewers to see which tests passed.
+
+Use verbose pytest output when a change adds or modifies tests:
+
+```powershell
+docker compose run --rm app uv run pytest -v
+```
+
+The report should include:
+
+* The command that was run
+* The total pass/fail result
+* The relevant test file or test names that passed
+* Any warnings that remain
+
 ---
 
 ## 6. Example Test Structure
