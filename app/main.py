@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from app.bot.client import MapleLandDiscordClient, create_discord_client
 from app.config import get_required_discord_token
+from app.logging_config import configure_logging
 
 
 def main(
@@ -13,6 +14,7 @@ def main(
 ) -> None:
     """Start the Discord bot."""
     load_dotenv()
+    configure_logging()
     token = get_required_discord_token()
     client = client_factory()
     client.run(token)

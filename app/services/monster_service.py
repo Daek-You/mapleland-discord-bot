@@ -78,10 +78,11 @@ def get_monster_search_response(
     try:
         result = search_monster(query, search_summaries, get_detail)
     except MapleNoteCrawlerError:
-        logger.exception("Failed to search MapleNote monster.")
+        logger.error("Failed to search MapleNote monster.", exc_info=True)
         return MonsterSearchResponse(content=MONSTER_SEARCH_FAILURE_MESSAGE)
 
     if result.detail:
+        _log_missing_monster_detail_data(result.detail)
         return MonsterSearchResponse(
             embed=format_monster_detail_embed(result.detail),
         )
@@ -92,6 +93,7 @@ def get_monster_search_response(
                 candidate_limit=candidate_limit,
             )
         )
+    logger.warning("Monster search returned no results.")
     return MonsterSearchResponse(content=MONSTER_SEARCH_EMPTY_MESSAGE)
 
 
@@ -106,12 +108,14 @@ def get_monster_drop_search_response(
     try:
         result = search_monster(query, search_summaries, get_detail)
     except MapleNoteCrawlerError:
-        logger.exception("Failed to search MapleNote monster drops.")
+        logger.error("Failed to search MapleNote monster drops.", exc_info=True)
         return MonsterSearchResponse(content=MONSTER_SEARCH_FAILURE_MESSAGE)
 
     if result.detail:
+        _log_missing_monster_detail_data(result.detail)
         drop_items = result.detail.drop_items or []
         if not drop_items:
+            logger.warning("Monster drop search found no drop items.")
             return MonsterSearchResponse(content="등록된 드랍 아이템이 없어요.")
         return MonsterSearchResponse(
             content=f"**{result.detail.name} 주요 드랍 아이템**",
@@ -125,6 +129,7 @@ def get_monster_drop_search_response(
                 candidate_limit=candidate_limit,
             )
         )
+    logger.warning("Monster drop search returned no results.")
     return MonsterSearchResponse(content=MONSTER_SEARCH_EMPTY_MESSAGE)
 
 
@@ -227,6 +232,27 @@ def format_monster_candidates(
 
 def _normalize_name(name: str) -> str:
     return "".join(name.casefold().split())
+
+
+def _log_missing_monster_detail_data(monster: MonsterDetail) -> None:
+    missing_fields = [
+        field_name
+        for field_name, value in (
+            ("level", monster.level),
+            ("hp", monster.hp),
+            ("mp", monster.mp),
+            ("exp", monster.exp),
+            ("element", monster.element),
+            ("image_url", monster.image_url),
+            ("spawn_locations", monster.spawn_locations),
+        )
+        if not value
+    ]
+    if missing_fields:
+        logger.warning(
+            "Monster detail data is missing expected fields: %s.",
+            ", ".join(missing_fields),
+        )
 
 
 def _format_spawn_locations(monster: MonsterDetail, spawn_limit: int) -> str:

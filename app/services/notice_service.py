@@ -23,7 +23,7 @@ def get_latest_notice_message(
     try:
         notice_items = fetch_notice_items()
     except MaplelandCrawlerError:
-        logger.exception("Failed to fetch Mapleland notices.")
+        logger.error("Failed to fetch Mapleland notices.", exc_info=True)
         return NOTICE_COMMAND_FAILURE_MESSAGE
 
     return format_notice_items(notice_items[:display_limit])

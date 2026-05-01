@@ -48,7 +48,7 @@ def collect_new_notice_notifications(
     try:
         notice_items = fetch_notice_items()
     except MaplelandCrawlerError:
-        logger.exception("Failed to fetch Mapleland notices for notification.")
+        logger.error("Failed to fetch Mapleland notices for notification.", exc_info=True)
         return []
 
     should_notify = not suppress_initial_notifications or repository.has_saved_notices()

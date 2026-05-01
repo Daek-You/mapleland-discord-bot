@@ -187,7 +187,31 @@ tmp()
 
 ---
 
-## 10. Error Handling Rules
+## 10. Logging Policy
+
+The bot uses Python's standard `logging` module with a shared app-level setup.
+
+Rules:
+
+* Configure logging once from `app.logging_config.configure_logging()`
+* Use module loggers with `logging.getLogger(__name__)`
+* Log format must include timestamp, level, logger name, and message
+* Log timestamps use `LOG_TIMEZONE`, defaulting to `Asia/Seoul`
+* Console logs include `INFO` and above
+* File logs include `WARNING` and above
+* Log files are written to `logs/bot.log` with UTF-8 encoding
+* Use rotating file logs with about 2MB to 5MB per file and `backupCount=5`
+* Keep `DEBUG` disabled by default; enable it only through configuration when needed
+* Log command execution and normal flow at `INFO`
+* Log expected missing data, no monster results, or no drop items at `WARNING`
+* Log crawler, HTML parsing, Discord API, button interaction, and unexpected failures at `ERROR`
+* Use `logger.error(..., exc_info=True)` inside exception handlers so tracebacks are preserved
+* Do not log successful pagination button clicks
+* Do not log secrets, tokens, raw environment values, or unnecessary repeated details
+
+---
+
+## 11. Error Handling Rules
 
 External services can fail even after the command response has already been sent. Handle those failures close to the code that calls the external API.
 

@@ -1,6 +1,8 @@
 import asyncio
+import logging
 
 import discord
+import pytest
 
 import app.bot.monster as monster_command
 from app.bot.command_config import MONSTER_COMMAND, MONSTER_DROP_COMMAND
@@ -218,6 +220,37 @@ def test_monster_drop_pagination_next_button_updates_message() -> None:
     assert interaction.response.edited_view.children[0].disabled is False
     assert interaction.response.edited_view.children[1].label == "2 / 2"
     assert interaction.response.edited_view.children[2].disabled is True
+
+
+def test_monster_drop_pagination_button_logs_http_failure(caplog) -> None:
+    class FakeDiscordResponse:
+        status = 500
+        reason = "Server Error"
+
+    class FailedResponse:
+        async def edit_message(self, **kwargs) -> None:
+            raise discord.HTTPException(
+                response=FakeDiscordResponse(),
+                message="edit failed",
+            )
+
+    class FailedInteraction:
+        response = FailedResponse()
+
+    view = monster_command.MonsterDropPaginationView(
+        drops=[
+            MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%")
+            for index in range(1, 10)
+        ],
+        monster_detail_url="https://example.com/monster_card/210100",
+    )
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(discord.HTTPException):
+            asyncio.run(view.children[2].callback(FailedInteraction()))
+
+    assert "Failed to handle monster drop pagination button." in caplog.text
+    assert "discord.errors.HTTPException" in caplog.text
 
 
 def test_monster_drop_pagination_timeout_disables_buttons_and_clears_drops() -> None:
