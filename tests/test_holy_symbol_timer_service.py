@@ -3,6 +3,7 @@ import asyncio
 from app.services.holy_symbol_timer_service import (
     HolySymbolTimerService,
     format_holy_symbol_expired_message,
+    format_remaining_time,
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
     format_holy_symbol_stop_response,
@@ -27,10 +28,6 @@ class FakeNotifier:
 
     async def send(self, message: str) -> None:
         self.messages.append(message)
-
-
-async def immediate_sleep(seconds: float) -> None:
-    await asyncio.sleep(0)
 
 
 def test_start_holy_symbol_timer_creates_timer() -> None:
@@ -123,21 +120,41 @@ def test_holy_symbol_response_formatters() -> None:
     assert format_holy_symbol_start_response(True) == "기존 홀심 타이머를 재시작했습니다."
     assert format_holy_symbol_stop_response(True) == "홀심 타이머를 중지했습니다."
     assert format_holy_symbol_status_response(42) == "홀심 남은 시간: 42초"
+    assert format_holy_symbol_status_response(72) == "홀심 남은 시간: 1분 12초"
     assert format_holy_symbol_warning_message(10) == "<@10> 🔔 홀심 10초 남음"
     assert format_holy_symbol_expired_message(10) == "<@10> ✨ 홀심 다시 사용!"
 
 
-def test_timer_sends_warning_and_expiration_notifications() -> None:
+def test_format_remaining_time_omits_minutes_when_under_one_minute() -> None:
+    assert format_remaining_time(30) == "30초"
+    assert format_remaining_time(60) == "1분 0초"
+    assert format_remaining_time(125) == "2분 5초"
+
+
+def test_timer_repeats_warning_and_expiration_notifications() -> None:
     async def run_test() -> None:
+        sleep_count = 0
+
+        async def repeat_sleep(seconds: float) -> None:
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count > 4:
+                raise asyncio.CancelledError
+            await asyncio.sleep(0)
+
         notifier = FakeNotifier()
-        service = HolySymbolTimerService(sleep=immediate_sleep)
+        service = HolySymbolTimerService(sleep=repeat_sleep)
 
         service.start_holy_symbol_timer(1, 10, notifier)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
 
         assert notifier.messages == [
+            "<@10> 🔔 홀심 10초 남음",
+            "<@10> ✨ 홀심 다시 사용!",
             "<@10> 🔔 홀심 10초 남음",
             "<@10> ✨ 홀심 다시 사용!",
         ]
