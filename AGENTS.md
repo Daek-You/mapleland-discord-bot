@@ -54,6 +54,8 @@ Rules:
 * Do NOT rewrite entire files unless asked
 * Reuse existing code
 * Do NOT duplicate logic
+* Avoid hardcoded magic numbers and configuration values
+* Store configurable values in a dedicated config module and read runtime values from environment variables
 
 ---
 
@@ -82,3 +84,19 @@ Rules:
 ## 9. Goal
 
 Build a clean, maintainable, and scalable system.
+
+## 10. Security Rules
+
+- Do NOT hardcode secrets (tokens, API keys)
+- Always use environment variables
+- Do NOT print or log sensitive values
+- Assume secrets are stored in .env
+
+## 11. Error Handling Rules
+
+- Always handle expected external-service failures explicitly.
+- Discord message edits, followups, and UI timeout callbacks can fail after the original message is deleted or expired.
+- Catch specific Discord exceptions such as `discord.NotFound` and `discord.HTTPException` around delayed UI/message updates.
+- Background tasks and timeout callbacks must not leak unhandled exceptions.
+- Always release or clear in-memory session state in `finally` when cleanup is required.
+- Add tests for new failure paths, including deleted-message and expired-interaction cases.
