@@ -166,13 +166,14 @@ def test_get_monster_drop_search_response_includes_items_without_icons() -> None
     )
 
     assert response.content == "**슬라임 주요 드랍 아이템**"
-    assert response.embeds is not None
-    assert len(response.embeds) == 10
-    assert response.embeds[0].title == "아이템 1"
-    assert response.embeds[0].thumbnail_url is None
+    assert response.embeds is None
+    assert response.drop_items is not None
+    assert len(response.drop_items) == 11
+    assert response.drop_items[0].name == "아이템 1"
+    assert response.drop_items[0].icon_url is None
 
 
-def test_get_monster_drop_search_response_limits_drop_items() -> None:
+def test_get_monster_drop_search_response_returns_all_drop_items_for_pagination() -> None:
     many_drop_detail = MonsterDetail(
         name="슬라임",
         level="6",
@@ -198,13 +199,13 @@ def test_get_monster_drop_search_response_limits_drop_items() -> None:
         get_detail=lambda detail_url: many_drop_detail,
     )
 
-    assert response.embeds is not None
-    assert len(response.embeds) == 10
-    assert response.embeds[-1].title == "아이템 10"
-    assert all(embed.title != "아이템 11" for embed in response.embeds)
+    assert response.drop_items is not None
+    assert len(response.drop_items) == 11
+    assert response.drop_items[-1].name == "아이템 11"
+    assert response.monster_detail_url == "https://example.com/monster_card/210100"
 
 
-def test_get_monster_drop_search_response_returns_drop_embeds() -> None:
+def test_get_monster_drop_search_response_returns_drop_items() -> None:
     response = get_monster_drop_search_response(
         "슬라임",
         search_summaries=lambda query: [SLIME_SUMMARY],
@@ -212,11 +213,11 @@ def test_get_monster_drop_search_response_returns_drop_embeds() -> None:
     )
 
     assert response.content == "**슬라임 주요 드랍 아이템**"
-    assert response.embeds is not None
-    assert response.embeds[0].title == "물컹물컹한 액체"
-    assert response.embeds[0].description == "드랍률: 40%"
-    assert response.embeds[0].thumbnail_url == "https://example.com/item/4000004.png"
-    assert response.embeds[0].footer == ""
+    assert response.embeds is None
+    assert response.drop_items is not None
+    assert response.drop_items[0].name == "물컹물컹한 액체"
+    assert response.drop_items[0].drop_rate == "40%"
+    assert response.drop_items[0].icon_url == "https://example.com/item/4000004.png"
 
 
 def test_get_monster_search_response_returns_failure_message_on_crawler_error() -> None:
