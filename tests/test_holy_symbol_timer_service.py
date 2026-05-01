@@ -3,6 +3,7 @@ import asyncio
 from app.services.holy_symbol_timer_service import (
     HolySymbolTimerService,
     format_holy_symbol_expired_message,
+    format_holy_symbol_expired_tts_message,
     format_remaining_time,
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
@@ -12,7 +13,10 @@ from app.services.holy_symbol_timer_service import (
     format_holy_symbol_thread_finished_message,
     format_holy_symbol_thread_start_message,
     format_holy_symbol_thread_stop_message,
+    format_holy_symbol_thread_unavailable_response,
+    format_holy_symbol_tts_notice,
     format_holy_symbol_warning_message,
+    format_holy_symbol_warning_tts_message,
 )
 
 
@@ -30,10 +34,14 @@ class ManualClock:
 class FakeNotifier:
     def __init__(self) -> None:
         self.messages: list[str] = []
+        self.tts_messages: list[str] = []
         self.closed_messages: list[str] = []
 
     async def send(self, message: str) -> None:
         self.messages.append(message)
+
+    async def send_tts(self, message: str) -> None:
+        self.tts_messages.append(message)
 
     async def close(self, message: str) -> None:
         self.closed_messages.append(message)
@@ -128,8 +136,14 @@ def test_missing_timer_returns_none_and_empty_state_message() -> None:
 
 
 def test_holy_symbol_response_formatters() -> None:
-    assert format_holy_symbol_start_response(False) == "홀심 타이머를 시작했습니다."
-    assert format_holy_symbol_start_response(True) == "기존 홀심 타이머를 재시작했습니다."
+    assert (
+        format_holy_symbol_start_response(False)
+        == f"홀심 타이머를 시작했습니다.\n\n{format_holy_symbol_tts_notice()}"
+    )
+    assert (
+        format_holy_symbol_start_response(True)
+        == f"기존 홀심 타이머를 재시작했습니다.\n\n{format_holy_symbol_tts_notice()}"
+    )
     assert format_holy_symbol_stop_response(True) == "홀심 타이머를 중지했습니다."
     assert format_holy_symbol_status_response(42) == "홀심 남은 시간: 42초"
     assert format_holy_symbol_status_response(72) == "홀심 남은 시간: 1분 12초"
@@ -141,8 +155,17 @@ def test_holy_symbol_response_formatters() -> None:
         format_holy_symbol_thread_close_message("타이머 종료됨")
         == "타이머 종료됨\n이 스레드는 곧 삭제됩니다."
     )
-    assert format_holy_symbol_warning_message() == "🔔 홀심 10초 남음"
-    assert format_holy_symbol_expired_message() == "✨ 홀심 다시 사용!"
+    assert format_holy_symbol_warning_message() == "홀심 10초 남음"
+    assert format_holy_symbol_warning_tts_message() == "홀심 10초 남음"
+    assert format_holy_symbol_expired_message() == "홀심 다시 사용"
+    assert format_holy_symbol_expired_tts_message() == "홀심 다시 사용"
+    assert (
+        format_holy_symbol_thread_unavailable_response()
+        == "현재 채널에는 메랜도우미가 없어요. 메랜도우미가 있는 채널에서 다시 시도해주세요."
+    )
+    assert "켜지 않아도 됩니다" in format_holy_symbol_tts_notice()
+    assert "타이머 스레드 채널을 보고 있어야 합니다" in format_holy_symbol_tts_notice()
+    assert "텍스트 음성 변환(TTS) 속도" in format_holy_symbol_tts_notice()
 
 
 def test_format_remaining_time_omits_minutes_when_under_one_minute() -> None:
@@ -172,12 +195,34 @@ def test_timer_repeats_warning_and_expiration_notifications() -> None:
         await asyncio.sleep(0)
         await asyncio.sleep(0)
 
-        assert notifier.messages == [
-            "🔔 홀심 10초 남음",
-            "✨ 홀심 다시 사용!",
-            "🔔 홀심 10초 남음",
-            "✨ 홀심 다시 사용!",
+        assert notifier.messages == []
+        assert notifier.tts_messages == [
+            "홀심 10초 남음",
+            "홀심 다시 사용",
+            "홀심 10초 남음",
+            "홀심 다시 사용",
         ]
         assert notifier.closed_messages == []
 
     asyncio.run(run_test())
+
+
+def test_holy_symbol_timer_messages_do_not_include_decorative_characters() -> None:
+    decorative_characters = ("🔔", "✨", "!", "→", "※")
+
+    assert all(
+        character not in format_holy_symbol_warning_tts_message()
+        for character in decorative_characters
+    )
+    assert all(
+        character not in format_holy_symbol_expired_tts_message()
+        for character in decorative_characters
+    )
+    assert all(
+        character not in format_holy_symbol_warning_message()
+        for character in decorative_characters
+    )
+    assert all(
+        character not in format_holy_symbol_expired_message()
+        for character in decorative_characters
+    )
