@@ -184,3 +184,31 @@ tmp()
 * Prefer simple Discord Markdown templates for text responses
 * Use `[title](url)` links instead of exposing long raw URLs when listing resources
 * Consider Discord embeds only when a message needs richer structure than Markdown can provide
+
+---
+
+## 10. Error Handling Rules
+
+External services can fail even after the command response has already been sent. Handle those failures close to the code that calls the external API.
+
+Rules:
+
+* Catch specific exceptions instead of broad `Exception` when the expected failure mode is known
+* Convert crawler/network failures into project-level crawler errors before returning to services
+* Log unexpected service failures with context, but do not log secrets or raw tokens
+* For Discord UI callbacks and timeout callbacks, guard delayed message edits with `discord.NotFound` and `discord.HTTPException`
+* Background tasks, scheduled jobs, and UI timeout callbacks must not leave unhandled task exceptions in logs
+* Clear in-memory session data in `finally` when cleanup must happen even if Discord API calls fail
+* Add tests for failure paths whenever adding new external calls, delayed callbacks, or cleanup logic
+
+### Discord UI Timeout Note
+
+`discord.ui.View.on_timeout()` can run minutes after the original command response. By then, the message may have been deleted or Discord may return `404 Unknown Message`.
+
+When editing an expired UI message:
+
+* Disable interactive controls first so local view state is consistent
+* Catch `discord.NotFound` and treat it as an already-gone message
+* Catch `discord.HTTPException` and log a warning instead of letting the timeout task crash
+* Always clear per-session memory state in `finally`
+* Prefer a visible disabled component for expired-state messaging when the notice should appear near the controls

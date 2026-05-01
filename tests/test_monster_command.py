@@ -1,5 +1,7 @@
 import asyncio
 
+import discord
+
 import app.bot.monster as monster_command
 from app.bot.command_config import MONSTER_COMMAND, MONSTER_DROP_COMMAND
 from app.bot.monster import register_monster_command
@@ -34,9 +36,11 @@ class FakeResponse:
 class FakeMessage:
     def __init__(self, response: FakeResponse) -> None:
         self.response = response
+        self.edited_content = None
         self.edited_view = None
 
     async def edit(self, **kwargs) -> None:
+        self.edited_content = kwargs.get("content")
         self.edited_view = kwargs.get("view")
 
 
@@ -187,7 +191,7 @@ def test_monster_drop_command_paginates_drop_embeds(monkeypatch) -> None:
         command_tree.commands[MONSTER_DROP_COMMAND.name]["callback"](interaction, "슬라임")
     )
 
-    assert interaction.response.message == "**슬라임 주요 드랍 아이템**"
+    assert interaction.response.message == "**슬라임 주요 드랍 아이템**\n조회 가능 시간: 3분"
     assert len(interaction.response.embeds) == 7
     assert interaction.response.embeds[0].title == "아이템 1"
     assert interaction.response.embeds[-1].title == "아이템 7"
@@ -201,7 +205,10 @@ def test_monster_drop_command_paginates_drop_embeds(monkeypatch) -> None:
 def test_monster_drop_pagination_next_button_updates_message() -> None:
     interaction = FakeInteraction()
     view = monster_command.MonsterDropPaginationView(
-        drops=[MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%") for index in range(1, 10)],
+        drops=[
+            MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%")
+            for index in range(1, 10)
+        ],
         monster_detail_url="https://example.com/monster_card/210100",
     )
 
@@ -216,8 +223,12 @@ def test_monster_drop_pagination_next_button_updates_message() -> None:
 def test_monster_drop_pagination_timeout_disables_buttons_and_clears_drops() -> None:
     interaction = FakeInteraction()
     view = monster_command.MonsterDropPaginationView(
-        drops=[MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%") for index in range(1, 10)],
+        drops=[
+            MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%")
+            for index in range(1, 10)
+        ],
         monster_detail_url="https://example.com/monster_card/210100",
+        content="**슬라임 주요 드랍 아이템**",
     )
     view.message = interaction.message
 
@@ -225,7 +236,43 @@ def test_monster_drop_pagination_timeout_disables_buttons_and_clears_drops() -> 
 
     assert all(child.disabled for child in view.children)
     assert view.drops == []
+    assert interaction.message.edited_content == "**슬라임 주요 드랍 아이템**"
     assert interaction.message.edited_view is view
+    assert len(interaction.message.edited_view.children) == 4
+    expired_notice = interaction.message.edited_view.children[3]
+    assert expired_notice.label == "조회 가능 시간이 끝났어요. 다시 조회해 주세요."
+    assert expired_notice.emoji.name == "⚠️"
+    assert expired_notice.style is discord.ButtonStyle.danger
+    assert expired_notice.disabled is True
+    assert expired_notice.row == 1
+
+
+def test_monster_drop_pagination_timeout_ignores_deleted_message() -> None:
+    class FakeDiscordResponse:
+        status = 404
+        reason = "Not Found"
+
+    class DeletedMessage:
+        async def edit(self, **kwargs) -> None:
+            raise discord.NotFound(
+                response=FakeDiscordResponse(),
+                message={"code": 10008, "message": "Unknown Message"},
+            )
+
+    view = monster_command.MonsterDropPaginationView(
+        drops=[
+            MonsterDropItem(name=f"아이템 {index}", drop_rate=f"{index}%")
+            for index in range(1, 10)
+        ],
+        monster_detail_url="https://example.com/monster_card/210100",
+        content="**슬라임 주요 드랍 아이템**",
+    )
+    view.message = DeletedMessage()
+
+    asyncio.run(view.on_timeout())
+
+    assert all(child.disabled for child in view.children)
+    assert view.drops == []
 
 
 def test_monster_drop_command_omits_buttons_for_single_page(monkeypatch) -> None:
