@@ -19,7 +19,8 @@ Holy Symbol timer commands:
 /홀심상태
 ```
 
-The timer repeats every 120 seconds until stopped and sends public channel reminders 10 seconds before each expiration and at each expiration.
+The timer runs for 100 seconds until stopped. Reminders are sent only to the
+user's private timer thread, 10 seconds before expiration and at expiration.
 
 TODO:
 

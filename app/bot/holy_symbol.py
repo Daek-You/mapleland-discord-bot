@@ -1,5 +1,7 @@
 """Discord slash command registration for Holy Symbol timers."""
 
+from __future__ import annotations
+
 import logging
 
 import discord
@@ -10,28 +12,96 @@ from app.bot.holy_symbol_command_config import (
     HOLY_SYMBOL_STATUS_COMMAND,
     HOLY_SYMBOL_STOP_COMMAND,
 )
+from app.config import DEFAULT_HOLY_SYMBOL_THREAD_NAME_FORMAT
 from app.services.holy_symbol_timer_service import (
     HolySymbolTimerService,
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
     format_holy_symbol_stop_response,
+    format_holy_symbol_thread_start_message,
+    format_holy_symbol_thread_stop_message,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
-class TextNotifier:
-    """Send timer notifications as public channel messages."""
+class ThreadNotifier:
+    """Send timer notifications to a private Discord thread."""
 
-    def __init__(self, channel: discord.abc.Messageable) -> None:
-        self.channel = channel
+    def __init__(self, thread: discord.abc.Messageable) -> None:
+        self.thread = thread
 
     async def send(self, message: str) -> None:
         try:
-            await self.channel.send(message)
-        except discord.HTTPException:
+            await self.thread.send(message)
+        except (discord.NotFound, discord.HTTPException):
             logger.error("Failed to send Holy Symbol timer notification.", exc_info=True)
+
+
+def _format_thread_name(user: object) -> str:
+    username = getattr(user, "display_name", None) or getattr(user, "name", str(user))
+    return DEFAULT_HOLY_SYMBOL_THREAD_NAME_FORMAT.format(username=username)
+
+
+def _is_thread_channel(channel: object) -> bool:
+    return isinstance(channel, discord.Thread) or (
+        hasattr(channel, "send") and hasattr(channel, "add_user")
+    )
+
+
+async def _fetch_thread(
+    interaction: discord.Interaction,
+    thread_id: int,
+) -> object | None:
+    guild = interaction.guild
+    if guild:
+        thread = guild.get_thread(thread_id)
+        if thread:
+            return thread
+
+    client = interaction.client
+    thread = client.get_channel(thread_id)
+    if _is_thread_channel(thread):
+        return thread
+
+    try:
+        fetched_channel = await client.fetch_channel(thread_id)
+    except (discord.NotFound, discord.HTTPException):
+        logger.info("Holy Symbol timer thread is unavailable. Creating a new thread.")
+        return None
+
+    if _is_thread_channel(fetched_channel):
+        return fetched_channel
+    return None
+
+
+async def _create_private_thread(
+    interaction: discord.Interaction,
+) -> object:
+    channel = interaction.channel
+    if channel is None or not hasattr(channel, "create_thread"):
+        raise RuntimeError("알림을 보낼 채널을 찾을 수 없습니다.")
+
+    thread = await channel.create_thread(
+        name=_format_thread_name(interaction.user),
+        type=discord.ChannelType.private_thread,
+        invitable=False,
+    )
+    await thread.add_user(interaction.user)
+    return thread
+
+
+async def _get_or_create_private_thread(
+    interaction: discord.Interaction,
+    existing_thread_id: int | None,
+) -> object:
+    if existing_thread_id is not None:
+        thread = await _fetch_thread(interaction, existing_thread_id)
+        if thread:
+            return thread
+
+    return await _create_private_thread(interaction)
 
 
 def register_holy_symbol_commands(
@@ -47,18 +117,23 @@ def register_holy_symbol_commands(
     async def holy_symbol_start(interaction: discord.Interaction) -> None:
         logger.info("/홀심시작 command executed.")
         try:
-            channel = interaction.channel
-            if channel is None:
-                await interaction.response.send_message(
-                    "알림을 보낼 채널을 찾을 수 없습니다.",
-                    ephemeral=True,
-                )
-                return
+            guild_id = interaction.guild_id or 0
+            user_id = interaction.user.id
+            existing_timer = timer_service.get_holy_symbol_timer(guild_id, user_id)
+            thread = await _get_or_create_private_thread(
+                interaction,
+                existing_timer.thread_id if existing_timer else None,
+            )
+            notifier = ThreadNotifier(thread)
 
             restarted = timer_service.start_holy_symbol_timer(
-                guild_id=interaction.guild_id or 0,
-                user_id=interaction.user.id,
-                notifier=TextNotifier(channel),
+                guild_id=guild_id,
+                user_id=user_id,
+                thread_id=thread.id,
+                notifier=notifier,
+            )
+            await notifier.send(
+                format_holy_symbol_thread_start_message(timer_service.duration_seconds)
             )
             await interaction.response.send_message(
                 format_holy_symbol_start_response(restarted),
@@ -78,10 +153,15 @@ def register_holy_symbol_commands(
     async def holy_symbol_stop(interaction: discord.Interaction) -> None:
         logger.info("/홀심중지 command executed.")
         try:
+            guild_id = interaction.guild_id or 0
+            user_id = interaction.user.id
+            timer = timer_service.get_holy_symbol_timer(guild_id, user_id)
             stopped = timer_service.stop_holy_symbol_timer(
-                guild_id=interaction.guild_id or 0,
-                user_id=interaction.user.id,
+                guild_id=guild_id,
+                user_id=user_id,
             )
+            if stopped and timer:
+                await timer.notifier.send(format_holy_symbol_thread_stop_message())
             await interaction.response.send_message(
                 format_holy_symbol_stop_response(stopped),
                 ephemeral=True,

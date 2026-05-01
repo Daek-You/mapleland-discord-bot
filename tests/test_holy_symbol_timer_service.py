@@ -7,6 +7,8 @@ from app.services.holy_symbol_timer_service import (
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
     format_holy_symbol_stop_response,
+    format_holy_symbol_thread_start_message,
+    format_holy_symbol_thread_stop_message,
     format_holy_symbol_warning_message,
 )
 
@@ -35,10 +37,11 @@ def test_start_holy_symbol_timer_creates_timer() -> None:
         clock = ManualClock()
         service = HolySymbolTimerService(now=clock.current_time)
 
-        restarted = service.start_holy_symbol_timer(1, 10, FakeNotifier())
+        restarted = service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
 
         assert restarted is False
-        assert service.get_holy_symbol_remaining_seconds(1, 10) == 120
+        assert service.get_holy_symbol_remaining_seconds(1, 10) == 100
+        assert service.get_holy_symbol_timer(1, 10).thread_id == 1000
         service.cancel_all()
 
     asyncio.run(run_test())
@@ -49,12 +52,12 @@ def test_start_holy_symbol_timer_replaces_same_user_timer() -> None:
         clock = ManualClock()
         service = HolySymbolTimerService(now=clock.current_time)
 
-        service.start_holy_symbol_timer(1, 10, FakeNotifier())
+        service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
         clock.advance(30)
-        restarted = service.start_holy_symbol_timer(1, 10, FakeNotifier())
+        restarted = service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
 
         assert restarted is True
-        assert service.get_holy_symbol_remaining_seconds(1, 10) == 120
+        assert service.get_holy_symbol_remaining_seconds(1, 10) == 100
         service.cancel_all()
 
     asyncio.run(run_test())
@@ -65,12 +68,14 @@ def test_different_users_keep_independent_timers() -> None:
         clock = ManualClock()
         service = HolySymbolTimerService(now=clock.current_time)
 
-        service.start_holy_symbol_timer(1, 10, FakeNotifier())
+        service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
         clock.advance(30)
-        service.start_holy_symbol_timer(1, 20, FakeNotifier())
+        service.start_holy_symbol_timer(1, 20, 2000, FakeNotifier())
 
-        assert service.get_holy_symbol_remaining_seconds(1, 10) == 90
-        assert service.get_holy_symbol_remaining_seconds(1, 20) == 120
+        assert service.get_holy_symbol_remaining_seconds(1, 10) == 70
+        assert service.get_holy_symbol_remaining_seconds(1, 20) == 100
+        assert service.get_holy_symbol_timer(1, 10).thread_id == 1000
+        assert service.get_holy_symbol_timer(1, 20).thread_id == 2000
         service.cancel_all()
 
     asyncio.run(run_test())
@@ -79,8 +84,8 @@ def test_different_users_keep_independent_timers() -> None:
 def test_stop_holy_symbol_timer_removes_only_matching_user_timer() -> None:
     async def run_test() -> None:
         service = HolySymbolTimerService()
-        service.start_holy_symbol_timer(1, 10, FakeNotifier())
-        service.start_holy_symbol_timer(1, 20, FakeNotifier())
+        service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
+        service.start_holy_symbol_timer(1, 20, 2000, FakeNotifier())
 
         stopped = service.stop_holy_symbol_timer(1, 10)
 
@@ -96,11 +101,11 @@ def test_status_returns_remaining_seconds() -> None:
     async def run_test() -> None:
         clock = ManualClock()
         service = HolySymbolTimerService(now=clock.current_time)
-        service.start_holy_symbol_timer(1, 10, FakeNotifier())
+        service.start_holy_symbol_timer(1, 10, 1000, FakeNotifier())
 
         clock.advance(78)
 
-        assert service.get_holy_symbol_remaining_seconds(1, 10) == 42
+        assert service.get_holy_symbol_remaining_seconds(1, 10) == 22
         service.cancel_all()
 
     asyncio.run(run_test())
@@ -121,8 +126,10 @@ def test_holy_symbol_response_formatters() -> None:
     assert format_holy_symbol_stop_response(True) == "홀심 타이머를 중지했습니다."
     assert format_holy_symbol_status_response(42) == "홀심 남은 시간: 42초"
     assert format_holy_symbol_status_response(72) == "홀심 남은 시간: 1분 12초"
-    assert format_holy_symbol_warning_message(10) == "<@10> 🔔 홀심 10초 남음"
-    assert format_holy_symbol_expired_message(10) == "<@10> ✨ 홀심 다시 사용!"
+    assert format_holy_symbol_thread_start_message(100) == "홀심 타이머 시작 (100초)"
+    assert format_holy_symbol_thread_stop_message() == "타이머를 중지했습니다."
+    assert format_holy_symbol_warning_message() == "🔔 홀심 10초 남음"
+    assert format_holy_symbol_expired_message() == "✨ 홀심 다시 사용!"
 
 
 def test_format_remaining_time_omits_minutes_when_under_one_minute() -> None:
@@ -145,7 +152,7 @@ def test_timer_repeats_warning_and_expiration_notifications() -> None:
         notifier = FakeNotifier()
         service = HolySymbolTimerService(sleep=repeat_sleep)
 
-        service.start_holy_symbol_timer(1, 10, notifier)
+        service.start_holy_symbol_timer(1, 10, 1000, notifier)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
@@ -153,10 +160,10 @@ def test_timer_repeats_warning_and_expiration_notifications() -> None:
         await asyncio.sleep(0)
 
         assert notifier.messages == [
-            "<@10> 🔔 홀심 10초 남음",
-            "<@10> ✨ 홀심 다시 사용!",
-            "<@10> 🔔 홀심 10초 남음",
-            "<@10> ✨ 홀심 다시 사용!",
+            "🔔 홀심 10초 남음",
+            "✨ 홀심 다시 사용!",
+            "🔔 홀심 10초 남음",
+            "✨ 홀심 다시 사용!",
         ]
 
     asyncio.run(run_test())
