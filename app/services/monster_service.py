@@ -63,6 +63,8 @@ class MonsterSearchResponse:
     content: str | None = None
     embed: MonsterEmbedData | None = None
     embeds: list[MonsterEmbedData] | None = None
+    drop_items: list[MonsterDropItem] | None = None
+    monster_detail_url: str | None = None
 
 
 def get_monster_search_response(
@@ -108,12 +110,13 @@ def get_monster_drop_search_response(
         return MonsterSearchResponse(content=MONSTER_SEARCH_FAILURE_MESSAGE)
 
     if result.detail:
-        embeds = format_drop_item_embeds(result.detail, drop_limit=drop_limit)
-        if not embeds:
-            return MonsterSearchResponse(content="드랍 아이템 정보가 없습니다.")
+        drop_items = result.detail.drop_items or []
+        if not drop_items:
+            return MonsterSearchResponse(content="등록된 드랍 아이템이 없어요.")
         return MonsterSearchResponse(
             content=f"**{result.detail.name} 주요 드랍 아이템**",
-            embeds=embeds,
+            drop_items=drop_items,
+            monster_detail_url=result.detail.detail_url,
         )
     if result.candidates:
         return MonsterSearchResponse(
