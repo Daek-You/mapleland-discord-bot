@@ -6,6 +6,7 @@ import logging
 import discord
 from discord import app_commands
 
+from app.bot.holy_symbol import register_holy_symbol_commands
 from app.bot.monster import register_monster_command
 from app.bot.notification_test import register_notification_test_command
 from app.bot.notice import register_notice_command
@@ -20,6 +21,7 @@ from app.services.notification_service import (
     collect_new_notice_notifications,
     format_notice_notification,
 )
+from app.services.holy_symbol_timer_service import HolySymbolTimerService
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ class MapleLandDiscordClient(discord.Client):
         self.command_tree = app_commands.CommandTree(self)
         self.notice_repository = create_default_notice_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
+        self.holy_symbol_timer_service = HolySymbolTimerService()
 
     async def setup_hook(self) -> None:
         """Register and sync slash commands."""
@@ -41,6 +44,10 @@ class MapleLandDiscordClient(discord.Client):
         register_notification_test_command(self.command_tree)
         register_notice_command(self.command_tree)
         register_ping_command(self.command_tree)
+        register_holy_symbol_commands(
+            self.command_tree,
+            self.holy_symbol_timer_service,
+        )
         self.notice_notification_task = asyncio.create_task(
             self._run_notice_notification_loop()
         )
@@ -66,6 +73,7 @@ class MapleLandDiscordClient(discord.Client):
         """Stop background tasks before closing the Discord client."""
         if self.notice_notification_task:
             self.notice_notification_task.cancel()
+        self.holy_symbol_timer_service.cancel_all()
         await super().close()
 
     async def _run_notice_notification_loop(self) -> None:

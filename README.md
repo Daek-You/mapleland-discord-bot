@@ -8,3 +8,20 @@ See [docs/development.md](docs/development.md) and [docs/testing.md](docs/testin
 ## Operations
 
 See [docs/operations.md](docs/operations.md) for separated development and production Docker Compose files, environment files, CI, Windows self-hosted runner deployment, restart behavior, startup registration, and log checks.
+
+## Commands
+
+Holy Symbol timer commands:
+
+```text
+/홀심시작
+/홀심중지
+/홀심상태
+```
+
+The timer uses the default 120-second Holy Symbol duration and sends public channel reminders 10 seconds before expiration and at expiration.
+
+TODO:
+
+* TTS notifications
+* Additional buff timers
