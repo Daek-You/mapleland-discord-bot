@@ -61,6 +61,10 @@ class ThreadNotifier:
             await self.thread.delete()
         except discord.NotFound:
             logger.info("Holy Symbol timer thread was already deleted.")
+        except discord.Forbidden:
+            logger.warning(
+                "Missing permission to delete Holy Symbol timer thread."
+            )
         except discord.HTTPException:
             logger.error("Failed to delete Holy Symbol timer thread.", exc_info=True)
         except Exception:

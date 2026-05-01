@@ -230,8 +230,10 @@ class HolySymbolTimerService:
                 await notifier.send(format_holy_symbol_warning_message())
                 await self._sleep(self.warning_before_expiration_seconds)
                 await notifier.send(format_holy_symbol_expired_message())
-                await notifier.close(format_holy_symbol_thread_finished_message())
-                return
+
+                current_timer = self._timers.get(key)
+                if current_timer and current_timer.task is asyncio.current_task():
+                    current_timer.expires_at = self._now() + self.duration_seconds
         except asyncio.CancelledError:
             raise
         except Exception:

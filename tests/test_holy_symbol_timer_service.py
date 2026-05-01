@@ -151,19 +151,23 @@ def test_format_remaining_time_omits_minutes_when_under_one_minute() -> None:
     assert format_remaining_time(125) == "2분 5초"
 
 
-def test_timer_sends_warning_expiration_and_finished_notifications() -> None:
+def test_timer_repeats_warning_and_expiration_notifications() -> None:
     async def run_test() -> None:
         sleep_count = 0
 
-        async def immediate_sleep(seconds: float) -> None:
+        async def repeat_sleep(seconds: float) -> None:
             nonlocal sleep_count
             sleep_count += 1
+            if sleep_count > 4:
+                raise asyncio.CancelledError
             await asyncio.sleep(0)
 
         notifier = FakeNotifier()
-        service = HolySymbolTimerService(sleep=immediate_sleep)
+        service = HolySymbolTimerService(sleep=repeat_sleep)
 
         service.start_holy_symbol_timer(1, 10, 1000, notifier)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
@@ -171,8 +175,9 @@ def test_timer_sends_warning_expiration_and_finished_notifications() -> None:
         assert notifier.messages == [
             "🔔 홀심 10초 남음",
             "✨ 홀심 다시 사용!",
+            "🔔 홀심 10초 남음",
+            "✨ 홀심 다시 사용!",
         ]
-        assert notifier.closed_messages == ["타이머 종료됨"]
-        assert service.get_holy_symbol_timer(1, 10) is None
+        assert notifier.closed_messages == []
 
     asyncio.run(run_test())
