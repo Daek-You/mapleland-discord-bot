@@ -51,6 +51,14 @@ Run the Discord bot after setting `.env`:
 docker compose run --rm app uv run python -m app.main
 ```
 
+Production uses a separate compose file and environment file:
+
+```powershell
+docker compose -f docker-compose.prod.yml up -d --build app
+```
+
+Use `.env` for local development and `.env.production` only on the production host.
+
 For local slash command testing, set `DISCORD_GUILD_ID` in `.env` so commands sync to one test server immediately.
 
 After changing dependencies in `pyproject.toml`, rebuild the image:

@@ -16,15 +16,18 @@ def test_pyproject_includes_pytest() -> None:
 def test_docker_configuration_uses_python_311_slim_and_uv() -> None:
     dockerfile = (PROJECT_ROOT / "Dockerfile").read_text()
     compose_file = (PROJECT_ROOT / "docker-compose.yml").read_text()
+    production_compose_file = (PROJECT_ROOT / "docker-compose.prod.yml").read_text()
 
     assert "FROM python:3.11-slim" in dockerfile
     assert "UV_PROJECT_ENVIRONMENT=/opt/venv" in dockerfile
     assert "uv sync --dev" in dockerfile
-    assert "restart: unless-stopped" in compose_file
-    assert "uv run python -m app.main" in compose_file
+    assert "uv run pytest" in compose_file
     assert "APP_ENV" in compose_file
     assert "BOT_NAME" in compose_file
     assert "DISCORD_ALERT_WEBHOOK_URL" in compose_file
     assert "NOTICE_CHANNEL_ID" in compose_file
     assert "NOTICE_CHECK_INTERVAL_SECONDS" in compose_file
     assert "NOTICE_DATABASE_PATH" in compose_file
+    assert "restart: unless-stopped" in production_compose_file
+    assert ".env.production" in production_compose_file
+    assert "uv run python -m app.main" in production_compose_file

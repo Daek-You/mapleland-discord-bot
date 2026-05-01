@@ -1,13 +1,17 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Message,
-    [string]$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
+    [string]$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path,
+    [string]$EnvFileName = ".env.production"
 )
 
 function Import-LocalEnv {
     param([string]$Root)
 
-    $envPath = Join-Path $Root ".env"
+    $envPath = Join-Path $Root $EnvFileName
+    if (-not (Test-Path -LiteralPath $envPath)) {
+        $envPath = Join-Path $Root ".env"
+    }
     if (-not (Test-Path -LiteralPath $envPath)) {
         return
     }
