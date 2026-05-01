@@ -13,6 +13,7 @@ from typing import Protocol
 
 from app.config import (
     DEFAULT_HOLY_SYMBOL_DURATION_SECONDS,
+    DEFAULT_HOLY_SYMBOL_TIMER_TYPE,
     DEFAULT_HOLY_SYMBOL_WARNING_BEFORE_EXPIRATION_SECONDS,
 )
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 class TimerType(str, Enum):
     """Supported timer types."""
 
-    HOLY_SYMBOL = "HOLY_SYMBOL"
+    HOLY_SYMBOL = DEFAULT_HOLY_SYMBOL_TIMER_TYPE
 
 
 class TimerNotifier(Protocol):
@@ -48,6 +49,16 @@ class TimerSession:
 
     task: asyncio.Task[None]
     expires_at: float
+    thread_id: int
+    notifier: TimerNotifier
+
+
+@dataclass(frozen=True)
+class HolySymbolTimerSnapshot:
+    """Read-only timer state used by command handlers."""
+
+    thread_id: int
+    notifier: TimerNotifier
 
 
 def format_holy_symbol_start_response(restarted: bool) -> str:
@@ -71,6 +82,16 @@ def format_holy_symbol_status_response(remaining_seconds: int | None) -> str:
     return f"홀심 남은 시간: {format_remaining_time(remaining_seconds)}"
 
 
+def format_holy_symbol_thread_start_message(duration_seconds: int) -> str:
+    """Return the message sent inside the user's timer thread."""
+    return f"홀심 타이머 시작 ({duration_seconds}초)"
+
+
+def format_holy_symbol_thread_stop_message() -> str:
+    """Return the stop message sent inside the user's timer thread."""
+    return "타이머를 중지했습니다."
+
+
 def format_remaining_time(total_seconds: int) -> str:
     """Return a compact Korean minute/second duration."""
     minutes, seconds = divmod(total_seconds, 60)
@@ -79,14 +100,14 @@ def format_remaining_time(total_seconds: int) -> str:
     return f"{minutes}분 {seconds}초"
 
 
-def format_holy_symbol_warning_message(user_id: int) -> str:
-    """Return the public warning notification."""
-    return f"<@{user_id}> 🔔 홀심 10초 남음"
+def format_holy_symbol_warning_message() -> str:
+    """Return the private thread warning notification."""
+    return "🔔 홀심 10초 남음"
 
 
-def format_holy_symbol_expired_message(user_id: int) -> str:
-    """Return the public expiration notification."""
-    return f"<@{user_id}> ✨ 홀심 다시 사용!"
+def format_holy_symbol_expired_message() -> str:
+    """Return the private thread expiration notification."""
+    return "✨ 홀심 다시 사용!"
 
 
 class HolySymbolTimerService:
@@ -111,6 +132,7 @@ class HolySymbolTimerService:
         self,
         guild_id: int,
         user_id: int,
+        thread_id: int,
         notifier: TimerNotifier,
     ) -> bool:
         """Start or restart one user's Holy Symbol timer."""
@@ -121,8 +143,13 @@ class HolySymbolTimerService:
             existing_timer.task.cancel()
 
         expires_at = self._now() + self.duration_seconds
-        task = asyncio.create_task(self._run_timer(key, user_id, notifier))
-        self._timers[key] = TimerSession(task=task, expires_at=expires_at)
+        task = asyncio.create_task(self._run_timer(key, notifier))
+        self._timers[key] = TimerSession(
+            task=task,
+            expires_at=expires_at,
+            thread_id=thread_id,
+            notifier=notifier,
+        )
         return restarted
 
     def stop_holy_symbol_timer(self, guild_id: int, user_id: int) -> bool:
@@ -148,6 +175,22 @@ class HolySymbolTimerService:
 
         return max(0, math.ceil(timer.expires_at - self._now()))
 
+    def get_holy_symbol_timer(
+        self,
+        guild_id: int,
+        user_id: int,
+    ) -> HolySymbolTimerSnapshot | None:
+        """Return one user's active Holy Symbol timer state."""
+        key = TimerKey(guild_id, user_id, TimerType.HOLY_SYMBOL)
+        timer = self._timers.get(key)
+        if not timer:
+            return None
+
+        return HolySymbolTimerSnapshot(
+            thread_id=timer.thread_id,
+            notifier=timer.notifier,
+        )
+
     def cancel_all(self) -> None:
         """Cancel all active timers."""
         for timer in self._timers.values():
@@ -157,7 +200,6 @@ class HolySymbolTimerService:
     async def _run_timer(
         self,
         key: TimerKey,
-        user_id: int,
         notifier: TimerNotifier,
     ) -> None:
         try:
@@ -167,9 +209,9 @@ class HolySymbolTimerService:
             )
             while True:
                 await self._sleep(warning_delay)
-                await notifier.send(format_holy_symbol_warning_message(user_id))
+                await notifier.send(format_holy_symbol_warning_message())
                 await self._sleep(self.warning_before_expiration_seconds)
-                await notifier.send(format_holy_symbol_expired_message(user_id))
+                await notifier.send(format_holy_symbol_expired_message())
 
                 current_timer = self._timers.get(key)
                 if current_timer and current_timer.task is asyncio.current_task():
