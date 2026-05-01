@@ -31,15 +31,23 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
     @app_commands.rename(name="이름")
     @app_commands.describe(name="검색할 몬스터 이름")
     async def monster(interaction: discord.Interaction, name: str) -> None:
-        response = get_monster_search_response(name)
-        if response.embed:
-            await interaction.response.send_message(
-                content=response.content,
-                embed=_create_monster_embed(response.embed),
-            )
-            return
+        logger.info("/몬스터 command executed.")
+        try:
+            response = get_monster_search_response(name)
+            if response.embed:
+                await interaction.response.send_message(
+                    content=response.content,
+                    embed=_create_monster_embed(response.embed),
+                )
+                return
 
-        await interaction.response.send_message(response.content)
+            await interaction.response.send_message(response.content)
+        except discord.HTTPException:
+            logger.error("Failed to send /몬스터 response.", exc_info=True)
+            raise
+        except Exception:
+            logger.error("/몬스터 command failed.", exc_info=True)
+            raise
 
     @command_tree.command(
         name=MONSTER_DROP_COMMAND.name,
@@ -48,27 +56,35 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
     @app_commands.rename(name="이름")
     @app_commands.describe(name="드랍 정보를 검색할 몬스터 이름")
     async def monster_drop(interaction: discord.Interaction, name: str) -> None:
-        response = get_monster_drop_search_response(name)
-        if response.drop_items:
-            await send_monster_drop_result(
-                interaction,
-                response.drop_items,
-                content=response.content,
-                monster_detail_url=response.monster_detail_url or "",
-            )
-            return
+        logger.info("/몬스터드랍 command executed.")
+        try:
+            response = get_monster_drop_search_response(name)
+            if response.drop_items:
+                await send_monster_drop_result(
+                    interaction,
+                    response.drop_items,
+                    content=response.content,
+                    monster_detail_url=response.monster_detail_url or "",
+                )
+                return
 
-        if response.embeds:
-            await interaction.response.send_message(
-                content=response.content,
-                embeds=[
-                    _create_monster_embed(embed_data)
-                    for embed_data in response.embeds
-                ],
-            )
-            return
+            if response.embeds:
+                await interaction.response.send_message(
+                    content=response.content,
+                    embeds=[
+                        _create_monster_embed(embed_data)
+                        for embed_data in response.embeds
+                    ],
+                )
+                return
 
-        await interaction.response.send_message(response.content)
+            await interaction.response.send_message(response.content)
+        except discord.HTTPException:
+            logger.error("Failed to send /몬스터드랍 response.", exc_info=True)
+            raise
+        except Exception:
+            logger.error("/몬스터드랍 command failed.", exc_info=True)
+            raise
 
 
 def build_drop_item_embeds(
@@ -229,7 +245,14 @@ class MonsterDropPaginationView(discord.ui.View):
 
     async def _update_message(self, interaction: discord.Interaction) -> None:
         self._refresh_buttons()
-        await interaction.response.edit_message(embeds=self.current_embeds, view=self)
+        try:
+            await interaction.response.edit_message(embeds=self.current_embeds, view=self)
+        except discord.HTTPException:
+            logger.error("Failed to handle monster drop pagination button.", exc_info=True)
+            raise
+        except Exception:
+            logger.error("Monster drop pagination button failed.", exc_info=True)
+            raise
 
     async def on_timeout(self) -> None:
         self._mark_expired()
@@ -239,7 +262,7 @@ class MonsterDropPaginationView(discord.ui.View):
         except discord.NotFound:
             pass
         except discord.HTTPException:
-            logger.warning("Failed to update expired monster drop pagination.", exc_info=True)
+            logger.error("Failed to update expired monster drop pagination.", exc_info=True)
         finally:
             self.drops = []
 

@@ -1,3 +1,5 @@
+import logging
+
 from app.crawler.maplenote import (
     MapleNoteCrawlerError,
     MonsterDetail,
@@ -132,15 +134,17 @@ def test_get_monster_search_response_returns_candidates_for_partial_matches() ->
     assert "2. [킹슬라임](https://example.com/monster_card/9300003) - LV 40" in message
 
 
-def test_get_monster_search_response_returns_empty_message_for_no_results() -> None:
-    response = get_monster_search_response(
-        "없는몹",
-        search_summaries=lambda query: [],
-        get_detail=lambda detail_url: SLIME_DETAIL,
-    )
+def test_get_monster_search_response_returns_empty_message_for_no_results(caplog) -> None:
+    with caplog.at_level(logging.WARNING):
+        response = get_monster_search_response(
+            "없는몹",
+            search_summaries=lambda query: [],
+            get_detail=lambda detail_url: SLIME_DETAIL,
+        )
 
     assert response.content == MONSTER_SEARCH_EMPTY_MESSAGE
     assert response.embed is None
+    assert "Monster search returned no results." in caplog.text
 
 
 def test_get_monster_drop_search_response_includes_items_without_icons() -> None:
@@ -218,6 +222,30 @@ def test_get_monster_drop_search_response_returns_drop_items() -> None:
     assert response.drop_items[0].name == "물컹물컹한 액체"
     assert response.drop_items[0].drop_rate == "40%"
     assert response.drop_items[0].icon_url == "https://example.com/item/4000004.png"
+
+
+def test_get_monster_drop_search_response_logs_missing_drop_items(caplog) -> None:
+    detail_without_drops = MonsterDetail(
+        name="슬라임",
+        level="6",
+        hp="50",
+        mp="35",
+        exp="10",
+        element="-",
+        detail_url="https://example.com/monster_card/210100",
+        image_url=None,
+        drop_items=[],
+    )
+
+    with caplog.at_level(logging.WARNING):
+        response = get_monster_drop_search_response(
+            "슬라임",
+            search_summaries=lambda query: [SLIME_SUMMARY],
+            get_detail=lambda detail_url: detail_without_drops,
+        )
+
+    assert response.content == "등록된 드랍 아이템이 없어요."
+    assert "Monster drop search found no drop items." in caplog.text
 
 
 def test_get_monster_search_response_returns_failure_message_on_crawler_error() -> None:

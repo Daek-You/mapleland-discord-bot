@@ -12,6 +12,8 @@ DISCORD_GUILD_ID_ENV_NAME = "DISCORD_GUILD_ID"
 NOTICE_CHANNEL_ID_ENV_NAME = "NOTICE_CHANNEL_ID"
 NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME = "NOTICE_CHECK_INTERVAL_SECONDS"
 NOTICE_DATABASE_PATH_ENV_NAME = "NOTICE_DATABASE_PATH"
+LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
+LOG_TIMEZONE_ENV_NAME = "LOG_TIMEZONE"
 
 MAPLELAND_NOTICE_LIST_URL = "https://maple.land/board/notices"
 MAPLELAND_NOTICE_PATH_PREFIX = "/board/notices/"
@@ -29,6 +31,11 @@ DEFAULT_MONSTER_SPAWN_DISPLAY_LIMIT = 10
 DEFAULT_MONSTER_EMBED_COLOR = 0x2ECC71
 DEFAULT_NOTICE_CHECK_INTERVAL_SECONDS = 600
 DEFAULT_NOTICE_DATABASE_PATH = "data/notices.sqlite3"
+DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_LOG_TIMEZONE = "Asia/Seoul"
+DEFAULT_LOG_FILE_PATH = "logs/bot.log"
+DEFAULT_LOG_MAX_BYTES = 5 * 1024 * 1024
+DEFAULT_LOG_BACKUP_COUNT = 5
 
 
 def get_required_discord_token() -> str:
@@ -62,3 +69,13 @@ def get_notice_check_interval_seconds() -> int:
 def get_notice_database_path() -> str:
     """Return the notice database path."""
     return os.getenv(NOTICE_DATABASE_PATH_ENV_NAME) or DEFAULT_NOTICE_DATABASE_PATH
+
+
+def get_log_level() -> str:
+    """Return the configured logging level name."""
+    return os.getenv(LOG_LEVEL_ENV_NAME) or DEFAULT_LOG_LEVEL
+
+
+def get_log_timezone() -> str:
+    """Return the configured IANA timezone name for log timestamps."""
+    return os.getenv(LOG_TIMEZONE_ENV_NAME) or DEFAULT_LOG_TIMEZONE

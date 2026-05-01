@@ -36,6 +36,7 @@ class MapleLandDiscordClient(discord.Client):
 
     async def setup_hook(self) -> None:
         """Register and sync slash commands."""
+        logger.info("Registering Discord slash commands.")
         register_monster_command(self.command_tree)
         register_notification_test_command(self.command_tree)
         register_notice_command(self.command_tree)
@@ -48,10 +49,18 @@ class MapleLandDiscordClient(discord.Client):
         if guild_id:
             guild = discord.Object(id=int(guild_id))
             self.command_tree.copy_global_to(guild=guild)
-            await self.command_tree.sync(guild=guild)
+            try:
+                await self.command_tree.sync(guild=guild)
+            except discord.HTTPException:
+                logger.error("Failed to sync Discord guild commands.", exc_info=True)
+                raise
             return
 
-        await self.command_tree.sync()
+        try:
+            await self.command_tree.sync()
+        except discord.HTTPException:
+            logger.error("Failed to sync Discord global commands.", exc_info=True)
+            raise
 
     async def close(self) -> None:
         """Stop background tasks before closing the Discord client."""
@@ -72,15 +81,23 @@ class MapleLandDiscordClient(discord.Client):
             logger.info("NOTICE_CHANNEL_ID is not set. Skipping notice notification.")
             return
 
-        channel = self.get_channel(int(channel_id)) or await self.fetch_channel(
-            int(channel_id)
-        )
+        try:
+            channel = self.get_channel(int(channel_id)) or await self.fetch_channel(
+                int(channel_id)
+            )
+        except discord.HTTPException:
+            logger.error("Failed to fetch notice notification channel.", exc_info=True)
+            return
+
         notifications = await asyncio.to_thread(
             collect_new_notice_notifications,
             notice_repository=self.notice_repository,
         )
         for notification in notifications:
-            await channel.send(format_notice_notification(notification))
+            try:
+                await channel.send(format_notice_notification(notification))
+            except discord.HTTPException:
+                logger.error("Failed to send notice notification.", exc_info=True)
 
 
 def create_discord_client() -> MapleLandDiscordClient:

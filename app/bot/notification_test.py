@@ -1,5 +1,7 @@
 """Discord slash command registration for notice notification testing."""
 
+import logging
+
 import discord
 from discord import app_commands
 
@@ -10,6 +12,9 @@ from app.services.notification_service import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def register_notification_test_command(command_tree: app_commands.CommandTree) -> None:
     """Register the /알림테스트 command."""
 
@@ -18,8 +23,16 @@ def register_notification_test_command(command_tree: app_commands.CommandTree) -
         description=NOTIFICATION_TEST_COMMAND.description,
     )
     async def notification_test(interaction: discord.Interaction) -> None:
-        notifications = collect_test_notice_notifications(str(interaction.id))
-        message = "\n\n".join(
-            format_notice_notification(notification) for notification in notifications
-        )
-        await interaction.response.send_message(message)
+        logger.info("/알림테스트 command executed.")
+        try:
+            notifications = collect_test_notice_notifications(str(interaction.id))
+            message = "\n\n".join(
+                format_notice_notification(notification) for notification in notifications
+            )
+            await interaction.response.send_message(message)
+        except discord.HTTPException:
+            logger.error("Failed to send /알림테스트 response.", exc_info=True)
+            raise
+        except Exception:
+            logger.error("/알림테스트 command failed.", exc_info=True)
+            raise
