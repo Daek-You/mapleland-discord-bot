@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord import app_commands
@@ -12,12 +14,16 @@ from app.bot.holy_symbol_command_config import (
     HOLY_SYMBOL_STATUS_COMMAND,
     HOLY_SYMBOL_STOP_COMMAND,
 )
-from app.config import DEFAULT_HOLY_SYMBOL_THREAD_NAME_FORMAT
+from app.config import (
+    DEFAULT_HOLY_SYMBOL_THREAD_DELETE_DELAY_SECONDS,
+    DEFAULT_HOLY_SYMBOL_THREAD_NAME_FORMAT,
+)
 from app.services.holy_symbol_timer_service import (
     HolySymbolTimerService,
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
     format_holy_symbol_stop_response,
+    format_holy_symbol_thread_close_message,
     format_holy_symbol_thread_start_message,
     format_holy_symbol_thread_stop_message,
 )
@@ -29,14 +35,39 @@ logger = logging.getLogger(__name__)
 class ThreadNotifier:
     """Send timer notifications to a private Discord thread."""
 
-    def __init__(self, thread: discord.abc.Messageable) -> None:
+    def __init__(
+        self,
+        thread: discord.abc.Messageable,
+        delete_delay_seconds: int = DEFAULT_HOLY_SYMBOL_THREAD_DELETE_DELAY_SECONDS,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    ) -> None:
         self.thread = thread
+        self.delete_delay_seconds = delete_delay_seconds
+        self._sleep = sleep
 
     async def send(self, message: str) -> None:
         try:
             await self.thread.send(message)
         except (discord.NotFound, discord.HTTPException):
             logger.error("Failed to send Holy Symbol timer notification.", exc_info=True)
+
+    async def close(self, message: str) -> None:
+        await self.send(format_holy_symbol_thread_close_message(message))
+        asyncio.create_task(self._delete_thread_after_delay())
+
+    async def _delete_thread_after_delay(self) -> None:
+        await self._sleep(self.delete_delay_seconds)
+        try:
+            await self.thread.delete()
+        except discord.NotFound:
+            logger.info("Holy Symbol timer thread was already deleted.")
+        except discord.HTTPException:
+            logger.error("Failed to delete Holy Symbol timer thread.", exc_info=True)
+        except Exception:
+            logger.error(
+                "Unexpected failure while deleting Holy Symbol timer thread.",
+                exc_info=True,
+            )
 
 
 def _format_thread_name(user: object) -> str:
@@ -107,6 +138,8 @@ async def _get_or_create_private_thread(
 def register_holy_symbol_commands(
     command_tree: app_commands.CommandTree,
     timer_service: HolySymbolTimerService,
+    thread_delete_delay_seconds: int = DEFAULT_HOLY_SYMBOL_THREAD_DELETE_DELAY_SECONDS,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> None:
     """Register Holy Symbol timer commands."""
 
@@ -124,7 +157,7 @@ def register_holy_symbol_commands(
                 interaction,
                 existing_timer.thread_id if existing_timer else None,
             )
-            notifier = ThreadNotifier(thread)
+            notifier = ThreadNotifier(thread, thread_delete_delay_seconds, sleep)
 
             restarted = timer_service.start_holy_symbol_timer(
                 guild_id=guild_id,
@@ -161,7 +194,7 @@ def register_holy_symbol_commands(
                 user_id=user_id,
             )
             if stopped and timer:
-                await timer.notifier.send(format_holy_symbol_thread_stop_message())
+                await timer.notifier.close(format_holy_symbol_thread_stop_message())
             await interaction.response.send_message(
                 format_holy_symbol_stop_response(stopped),
                 ephemeral=True,

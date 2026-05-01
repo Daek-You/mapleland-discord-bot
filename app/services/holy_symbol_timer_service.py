@@ -33,6 +33,9 @@ class TimerNotifier(Protocol):
     async def send(self, message: str) -> None:
         """Send a timer notification."""
 
+    async def close(self, message: str) -> None:
+        """Send a closing notification and clean up notifier resources."""
+
 
 @dataclass(frozen=True)
 class TimerKey:
@@ -90,6 +93,21 @@ def format_holy_symbol_thread_start_message(duration_seconds: int) -> str:
 def format_holy_symbol_thread_stop_message() -> str:
     """Return the stop message sent inside the user's timer thread."""
     return "타이머를 중지했습니다."
+
+
+def format_holy_symbol_thread_finished_message() -> str:
+    """Return the natural timer completion message."""
+    return "타이머 종료됨"
+
+
+def format_holy_symbol_thread_delete_notice() -> str:
+    """Return the thread deletion notice."""
+    return "이 스레드는 곧 삭제됩니다."
+
+
+def format_holy_symbol_thread_close_message(message: str) -> str:
+    """Return a closing message with the deletion notice."""
+    return f"{message}\n{format_holy_symbol_thread_delete_notice()}"
 
 
 def format_remaining_time(total_seconds: int) -> str:
@@ -212,10 +230,8 @@ class HolySymbolTimerService:
                 await notifier.send(format_holy_symbol_warning_message())
                 await self._sleep(self.warning_before_expiration_seconds)
                 await notifier.send(format_holy_symbol_expired_message())
-
-                current_timer = self._timers.get(key)
-                if current_timer and current_timer.task is asyncio.current_task():
-                    current_timer.expires_at = self._now() + self.duration_seconds
+                await notifier.close(format_holy_symbol_thread_finished_message())
+                return
         except asyncio.CancelledError:
             raise
         except Exception:

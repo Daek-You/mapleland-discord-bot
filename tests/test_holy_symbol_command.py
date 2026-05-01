@@ -1,6 +1,8 @@
 import asyncio
 
-from app.bot.holy_symbol import register_holy_symbol_commands
+import discord
+
+from app.bot.holy_symbol import ThreadNotifier, register_holy_symbol_commands
 from app.bot.holy_symbol_command_config import (
     HOLY_SYMBOL_START_COMMAND,
     HOLY_SYMBOL_STATUS_COMMAND,
@@ -32,12 +34,16 @@ class FakeThread:
         self.name = name
         self.messages: list[str] = []
         self.added_users: list[FakeUser] = []
+        self.deleted = False
 
     async def add_user(self, user: FakeUser) -> None:
         self.added_users.append(user)
 
     async def send(self, message: str) -> None:
         self.messages.append(message)
+
+    async def delete(self) -> None:
+        self.deleted = True
 
 
 class FakeChannel:
@@ -104,7 +110,11 @@ def test_holy_symbol_start_command_starts_timer_with_ephemeral_response() -> Non
         command_tree = FakeCommandTree()
         interaction = FakeInteraction()
         service = HolySymbolTimerService()
-        register_holy_symbol_commands(command_tree, service)
+        register_holy_symbol_commands(
+            command_tree,
+            service,
+            thread_delete_delay_seconds=0,
+        )
 
         await command_tree.commands[HOLY_SYMBOL_START_COMMAND.name]["callback"](
             interaction
@@ -128,7 +138,11 @@ def test_holy_symbol_stop_command_stops_timer_with_ephemeral_response() -> None:
         command_tree = FakeCommandTree()
         interaction = FakeInteraction()
         service = HolySymbolTimerService()
-        register_holy_symbol_commands(command_tree, service)
+        register_holy_symbol_commands(
+            command_tree,
+            service,
+            thread_delete_delay_seconds=0,
+        )
         await command_tree.commands[HOLY_SYMBOL_START_COMMAND.name]["callback"](
             interaction
         )
@@ -140,7 +154,56 @@ def test_holy_symbol_stop_command_stops_timer_with_ephemeral_response() -> None:
         assert interaction.response.message == "홀심 타이머를 중지했습니다."
         assert interaction.response.ephemeral is True
         assert service.get_holy_symbol_remaining_seconds(1, 10) is None
-        assert interaction.channel.threads[0].messages[-1] == "타이머를 중지했습니다."
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert (
+            interaction.channel.threads[0].messages[-1]
+            == "타이머를 중지했습니다.\n이 스레드는 곧 삭제됩니다."
+        )
+        assert interaction.channel.threads[0].deleted is True
+
+    asyncio.run(run_test())
+
+
+def test_thread_notifier_ignores_already_deleted_thread() -> None:
+    class FakeResponseForNotFound:
+        status = 404
+        reason = "Not Found"
+
+    class DeletedThread(FakeThread):
+        async def delete(self) -> None:
+            raise discord.NotFound(FakeResponseForNotFound(), "missing")
+
+    async def run_test() -> None:
+        thread = DeletedThread(1000, "deleted")
+        notifier = ThreadNotifier(thread, delete_delay_seconds=0)
+
+        await notifier.close("타이머 종료됨")
+        await asyncio.sleep(0)
+
+        assert thread.messages == ["타이머 종료됨\n이 스레드는 곧 삭제됩니다."]
+
+    asyncio.run(run_test())
+
+
+def test_thread_notifier_logs_discord_delete_failure() -> None:
+    class FakeResponseForHttpException:
+        status = 500
+        reason = "Server Error"
+
+    class FailingThread(FakeThread):
+        async def delete(self) -> None:
+            raise discord.HTTPException(FakeResponseForHttpException(), "failed")
+
+    async def run_test() -> None:
+        thread = FailingThread(1000, "failing")
+        notifier = ThreadNotifier(thread, delete_delay_seconds=0)
+
+        await notifier.close("타이머 종료됨")
+        await asyncio.sleep(0)
+
+        assert thread.messages == ["타이머 종료됨\n이 스레드는 곧 삭제됩니다."]
 
     asyncio.run(run_test())
 
