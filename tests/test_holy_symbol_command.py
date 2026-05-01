@@ -208,6 +208,27 @@ def test_thread_notifier_logs_discord_delete_failure() -> None:
     asyncio.run(run_test())
 
 
+def test_thread_notifier_logs_missing_delete_permission() -> None:
+    class FakeResponseForForbidden:
+        status = 403
+        reason = "Forbidden"
+
+    class ForbiddenThread(FakeThread):
+        async def delete(self) -> None:
+            raise discord.Forbidden(FakeResponseForForbidden(), "missing permissions")
+
+    async def run_test() -> None:
+        thread = ForbiddenThread(1000, "forbidden")
+        notifier = ThreadNotifier(thread, delete_delay_seconds=0)
+
+        await notifier.close("타이머 종료됨")
+        await asyncio.sleep(0)
+
+        assert thread.messages == ["타이머 종료됨\n이 스레드는 곧 삭제됩니다."]
+
+    asyncio.run(run_test())
+
+
 def test_holy_symbol_stop_command_handles_missing_timer() -> None:
     async def run_test() -> None:
         command_tree = FakeCommandTree()
