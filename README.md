@@ -7,4 +7,4 @@ See [docs/development.md](docs/development.md) and [docs/testing.md](docs/testin
 
 ## Operations
 
-See [docs/operations.md](docs/operations.md) for production environment variables, Windows self-hosted runner deployment, process restart, startup registration, and log checks.
+See [docs/operations.md](docs/operations.md) for separated development and production Docker Compose files, environment files, CI, Windows self-hosted runner deployment, restart behavior, startup registration, and log checks.

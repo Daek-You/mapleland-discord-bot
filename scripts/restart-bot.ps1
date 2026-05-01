@@ -5,6 +5,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-Location -LiteralPath $ProjectRoot
+$productionEnvPath = Join-Path $ProjectRoot ".env.production"
+
+if (-not (Test-Path -LiteralPath $productionEnvPath)) {
+    throw ".env.production is required for production restart."
+}
 
 function New-UnicodeMessage {
     param([int[]]$CodePoints)
@@ -19,8 +24,7 @@ if ($NotifyDeployment) {
     & "$PSScriptRoot\notify-discord.ps1" -ProjectRoot $ProjectRoot -Message $deployStartMessage
 }
 
-docker compose up -d --build app
-docker compose restart app
+docker compose -f docker-compose.prod.yml up -d --build app
 
 if ($NotifyDeployment) {
     & "$PSScriptRoot\notify-discord.ps1" -ProjectRoot $ProjectRoot -Message $deploySuccessMessage

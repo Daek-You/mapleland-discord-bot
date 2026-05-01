@@ -1,7 +1,6 @@
 services:
   app:
     build: .
-    restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}
       BOT_NAME: ${BOT_NAME:-mapleland-discord-bot}
@@ -16,4 +15,4 @@ services:
       LOG_TIMEZONE: ${LOG_TIMEZONE:-}
     volumes:
       - .:/app
-    command: uv run python -m app.main
+    command: uv run pytest -p no:cacheprovider

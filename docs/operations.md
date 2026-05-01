@@ -1,12 +1,28 @@
 # Operations Guide
 
-## Environment
+## Environment Files
 
-Runtime mode is selected with `APP_ENV`.
+Development and production use separate environment files.
 
-Use `development` for local work and `production` on the Windows host. Secrets must live only in `.env`, Windows environment variables, or GitHub Secrets.
+Development:
 
-Required or commonly used variables:
+```text
+.env
+.env.example
+docker-compose.yml
+```
+
+Production:
+
+```text
+.env.production
+.env.production.example
+docker-compose.prod.yml
+```
+
+Do not commit real token, webhook, channel, guild, or API key values. `.env` and `.env.production` are ignored by Git.
+
+Production variables:
 
 ```text
 APP_ENV=production
@@ -23,28 +39,35 @@ LOG_LEVEL=INFO
 LOG_TIMEZONE=Asia/Seoul
 ```
 
-Do not commit real token, webhook, channel, guild, or API key values.
-
 ## Development Run
 
-Run tests in Docker:
+Run tests with the development compose file:
 
 ```powershell
 docker compose run --rm app uv run pytest
 ```
 
-Run the bot in Docker after setting `.env`:
+Run the bot locally after setting `.env`:
 
 ```powershell
-docker compose up -d --build app
-docker compose logs -f app
+docker compose run --rm app uv run python -m app.main
 ```
 
-Set `APP_ENV=development` in local `.env`.
+The default `docker-compose.yml` command stays test-focused for local development and CI.
+
+## CI Runner
+
+`.github/workflows/ci.yml` runs tests on GitHub-hosted `ubuntu-latest`.
+
+It is for verification only:
+
+* no production secrets
+* no deployment
+* no self-hosted runner requirement
 
 ## Production Host Setup
 
-Install these on the friend's Windows PC:
+Install these on the production Windows PC:
 
 * Git
 * Docker Desktop
@@ -54,16 +77,16 @@ Python and uv do not need to be installed on the Windows host. They run inside t
 
 Enable Docker Desktop's start-on-login option so containers can come back after Windows restarts.
 
-Clone the repository and create a local `.env` from `.env.example`. Fill values only on the host.
+Clone the repository and create `.env.production` from `.env.production.example`. Fill values only on the host.
 
-Build and test the container:
+Build and test the production image:
 
 ```powershell
-docker compose build app
+docker compose -f docker-compose.prod.yml build app
 docker compose run --rm app uv run pytest
 ```
 
-Start the bot container manually:
+Start the production bot container:
 
 ```powershell
 .\scripts\start-bot.ps1
@@ -81,9 +104,30 @@ Stop manually:
 .\scripts\stop-bot.ps1
 ```
 
+## Production Runner
+
+The deploy workflow requires a self-hosted Windows runner with these labels:
+
+```text
+self-hosted
+Windows
+production
+```
+
+The extra `production` label prevents development or test runners from accidentally picking up production deploy jobs.
+
+Install the GitHub Actions runner as a Windows service from the runner directory:
+
+```powershell
+.\svc.cmd install
+.\svc.cmd start
+```
+
+GitHub does not connect inbound to the production PC. The self-hosted runner keeps an outbound connection to GitHub, so fixed IP, DDNS, port forwarding, and firewall inbound rules are not required.
+
 ## Windows Startup
 
-The bot container uses Docker Compose `restart: unless-stopped`.
+The production container uses Docker Compose `restart: unless-stopped`.
 
 For reboot recovery:
 
@@ -94,37 +138,29 @@ For reboot recovery:
 .\scripts\register-startup-task.ps1
 ```
 
-The GitHub Actions runner should also be installed as a Windows service from the runner directory:
-
-```powershell
-.\svc.cmd install
-.\svc.cmd start
-```
-
-This keeps both the runner and bot available after a Windows reboot.
+This keeps the bot available after a Windows reboot.
 
 If the production clone is not the same directory as the GitHub Actions workspace, set a repository Actions variable named `PRODUCTION_PROJECT_ROOT` to the absolute production path, for example `C:\apps\mapleland-discord-bot`.
 
 ## Deployment Flow
 
 1. A push or PR merge updates `main`.
-2. GitHub Actions starts on the self-hosted Windows runner.
-3. The runner checks out latest `main`.
-4. `scripts/deploy.ps1` fetches and fast-forwards `main`.
-5. Docker Compose rebuilds the app image.
-6. Docker Compose starts or recreates the bot container.
-7. Discord webhook notifications report deploy start, success, or failure.
-
-GitHub does not connect inbound to the friend's PC. The self-hosted runner keeps an outbound connection to GitHub, so fixed IP, DDNS, port forwarding, and firewall inbound rules are not required.
+2. GitHub Actions starts `deploy.yml`.
+3. A self-hosted Windows runner with the `production` label picks up the job.
+4. `scripts/deploy.ps1` checks for `.env.production`.
+5. The script fetches and fast-forwards `main`.
+6. Docker Compose rebuilds with `docker-compose.prod.yml`.
+7. Docker Compose starts or recreates the bot container.
+8. Discord webhook notifications report deploy start, success, or failure.
 
 ## Process Supervision
 
 Docker Compose runs the bot with `restart: unless-stopped`. If the bot process exits unexpectedly, Docker restarts the container.
 
-Check container status:
+Check production container status:
 
 ```powershell
-docker compose ps app
+docker compose -f docker-compose.prod.yml ps app
 ```
 
 ## Logs
@@ -132,7 +168,7 @@ docker compose ps app
 Container logs:
 
 ```powershell
-docker compose logs -f app
+docker compose -f docker-compose.prod.yml logs -f app
 ```
 
 Application file logs:
@@ -148,11 +184,12 @@ GitHub Actions deployment output is available in the repository Actions tab. Do 
 Check these in order:
 
 * GitHub Actions job result and deploy step output
-* `docker compose ps app`
-* `docker compose logs --tail=100 app`
+* The production runner is online and has the `production` label
+* `docker compose -f docker-compose.prod.yml ps app`
+* `docker compose -f docker-compose.prod.yml logs --tail=100 app`
 * `logs/bot.log`
 * Windows Task Scheduler history for `MapleLandDiscordBot`
 * Docker Desktop is running
 * GitHub runner service status
-* `.env` exists on the host and includes required values
+* `.env.production` exists on the host and includes required values
 * `DISCORD_ALERT_WEBHOOK_URL` or `DISCORD_DEPLOY_WEBHOOK_URL` is valid
