@@ -1,5 +1,6 @@
 """Discord slash command registration for monster search."""
 
+import logging
 import math
 import secrets
 
@@ -18,6 +19,9 @@ from app.services.monster_service import (
     get_monster_drop_search_response,
     get_monster_search_response,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def register_monster_command(command_tree: app_commands.CommandTree) -> None:
@@ -124,6 +128,16 @@ def disable_pagination_row(row: list[discord.ui.Button]) -> list[discord.ui.Butt
     return row
 
 
+def build_expired_pagination_notice() -> discord.ui.Button:
+    return discord.ui.Button(
+        label="조회 가능 시간이 끝났어요. 다시 조회해 주세요.",
+        emoji="⚠️",
+        style=discord.ButtonStyle.danger,
+        disabled=True,
+        row=1,
+    )
+
+
 async def send_monster_drop_result(
     interaction: discord.Interaction,
     drops: list[MonsterDropItem],
@@ -133,13 +147,15 @@ async def send_monster_drop_result(
     view = MonsterDropPaginationView(
         drops=drops,
         monster_detail_url=monster_detail_url,
-    )
-    await interaction.response.send_message(
         content=content,
-        embeds=view.current_embeds,
-        view=view if view.total_pages > 1 else None,
     )
-    if view.total_pages > 1:
+    has_multiple_pages = view.total_pages > 1
+    await interaction.response.send_message(
+        content=view.active_content if has_multiple_pages else content,
+        embeds=view.current_embeds,
+        view=view if has_multiple_pages else None,
+    )
+    if has_multiple_pages:
         view.message = await interaction.original_response()
 
 
@@ -150,18 +166,35 @@ class MonsterDropPaginationView(discord.ui.View):
         self,
         drops: list[MonsterDropItem],
         monster_detail_url: str,
+        content: str | None = None,
         page_size: int = DEFAULT_MONSTER_DROP_PAGE_SIZE,
         token: str | None = None,
     ) -> None:
         super().__init__(timeout=DEFAULT_MONSTER_DROP_PAGINATION_TIMEOUT_SECONDS)
         self.drops = drops
         self.monster_detail_url = monster_detail_url
+        self.content = content
         self.page_size = page_size
         self.current_page = 0
         self.token = token or secrets.token_hex(8)
         self.message: discord.Message | None = None
         self.total_pages = max(1, math.ceil(len(drops) / page_size))
         self._refresh_buttons()
+
+    @property
+    def active_content(self) -> str | None:
+        if not self.content:
+            return "조회 가능 시간: 3분"
+        return f"{self.content}\n조회 가능 시간: 3분"
+
+    @property
+    def expired_content(self) -> str | None:
+        return self.content
+
+    def _mark_expired(self) -> None:
+        disable_pagination_row(list(self.children))
+        self.add_item(build_expired_pagination_notice())
+
 
     @property
     def current_embeds(self) -> list[discord.Embed]:
@@ -199,10 +232,16 @@ class MonsterDropPaginationView(discord.ui.View):
         await interaction.response.edit_message(embeds=self.current_embeds, view=self)
 
     async def on_timeout(self) -> None:
-        disable_pagination_row(list(self.children))
-        if self.message:
-            await self.message.edit(view=self)
-        self.drops = []
+        self._mark_expired()
+        try:
+            if self.message:
+                await self.message.edit(content=self.expired_content, view=self)
+        except discord.NotFound:
+            pass
+        except discord.HTTPException:
+            logger.warning("Failed to update expired monster drop pagination.", exc_info=True)
+        finally:
+            self.drops = []
 
 
 def _create_monster_embed(embed_data: MonsterEmbedData) -> discord.Embed:

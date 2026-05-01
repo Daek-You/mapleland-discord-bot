@@ -91,3 +91,12 @@ Build a clean, maintainable, and scalable system.
 - Always use environment variables
 - Do NOT print or log sensitive values
 - Assume secrets are stored in .env
+
+## 11. Error Handling Rules
+
+- Always handle expected external-service failures explicitly.
+- Discord message edits, followups, and UI timeout callbacks can fail after the original message is deleted or expired.
+- Catch specific Discord exceptions such as `discord.NotFound` and `discord.HTTPException` around delayed UI/message updates.
+- Background tasks and timeout callbacks must not leak unhandled exceptions.
+- Always release or clear in-memory session state in `finally` when cleanup is required.
+- Add tests for new failure paths, including deleted-message and expired-interaction cases.
