@@ -14,6 +14,10 @@ NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME = "NOTICE_CHECK_INTERVAL_SECONDS"
 NOTICE_DATABASE_PATH_ENV_NAME = "NOTICE_DATABASE_PATH"
 LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
 LOG_TIMEZONE_ENV_NAME = "LOG_TIMEZONE"
+APP_ENV_ENV_NAME = "APP_ENV"
+BOT_NAME_ENV_NAME = "BOT_NAME"
+DISCORD_ALERT_WEBHOOK_URL_ENV_NAME = "DISCORD_ALERT_WEBHOOK_URL"
+DISCORD_ALERT_CHANNEL_ID_ENV_NAME = "DISCORD_ALERT_CHANNEL_ID"
 
 MAPLELAND_NOTICE_LIST_URL = "https://maple.land/board/notices"
 MAPLELAND_NOTICE_PATH_PREFIX = "/board/notices/"
@@ -36,6 +40,9 @@ DEFAULT_LOG_TIMEZONE = "Asia/Seoul"
 DEFAULT_LOG_FILE_PATH = "logs/bot.log"
 DEFAULT_LOG_MAX_BYTES = 5 * 1024 * 1024
 DEFAULT_LOG_BACKUP_COUNT = 5
+DEFAULT_APP_ENV = "development"
+DEFAULT_BOT_NAME = "mapleland-discord-bot"
+VALID_APP_ENVS = {"development", "production"}
 
 
 def get_required_discord_token() -> str:
@@ -79,3 +86,28 @@ def get_log_level() -> str:
 def get_log_timezone() -> str:
     """Return the configured IANA timezone name for log timestamps."""
     return os.getenv(LOG_TIMEZONE_ENV_NAME) or DEFAULT_LOG_TIMEZONE
+
+
+def get_app_env() -> str:
+    """Return the configured application environment."""
+    app_env = (os.getenv(APP_ENV_ENV_NAME) or DEFAULT_APP_ENV).lower()
+    if app_env not in VALID_APP_ENVS:
+        raise RuntimeError(
+            f"{APP_ENV_ENV_NAME} must be one of: {', '.join(sorted(VALID_APP_ENVS))}."
+        )
+    return app_env
+
+
+def get_bot_name() -> str:
+    """Return the display name used in operational notifications."""
+    return os.getenv(BOT_NAME_ENV_NAME) or DEFAULT_BOT_NAME
+
+
+def get_discord_alert_webhook_url() -> str | None:
+    """Return the Discord webhook URL for operational alerts."""
+    return os.getenv(DISCORD_ALERT_WEBHOOK_URL_ENV_NAME)
+
+
+def get_discord_alert_channel_id() -> str | None:
+    """Return the Discord channel id reserved for operational alerts."""
+    return os.getenv(DISCORD_ALERT_CHANNEL_ID_ENV_NAME)
