@@ -132,7 +132,7 @@ def test_holy_symbol_status_command_returns_remaining_time() -> None:
             interaction
         )
 
-        assert interaction.response.message == "홀심 남은 시간: 120초"
+        assert interaction.response.message == "홀심 남은 시간: 2분 0초"
         assert interaction.response.ephemeral is True
         service.cancel_all()
 

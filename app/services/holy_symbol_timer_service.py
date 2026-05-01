@@ -68,7 +68,15 @@ def format_holy_symbol_status_response(remaining_seconds: int | None) -> str:
     """Return the /홀심상태 response."""
     if remaining_seconds is None:
         return "실행 중인 홀심 타이머가 없습니다."
-    return f"홀심 남은 시간: {remaining_seconds}초"
+    return f"홀심 남은 시간: {format_remaining_time(remaining_seconds)}"
+
+
+def format_remaining_time(total_seconds: int) -> str:
+    """Return a compact Korean minute/second duration."""
+    minutes, seconds = divmod(total_seconds, 60)
+    if minutes <= 0:
+        return f"{seconds}초"
+    return f"{minutes}분 {seconds}초"
 
 
 def format_holy_symbol_warning_message(user_id: int) -> str:
@@ -157,10 +165,15 @@ class HolySymbolTimerService:
                 0,
                 self.duration_seconds - self.warning_before_expiration_seconds,
             )
-            await self._sleep(warning_delay)
-            await notifier.send(format_holy_symbol_warning_message(user_id))
-            await self._sleep(self.warning_before_expiration_seconds)
-            await notifier.send(format_holy_symbol_expired_message(user_id))
+            while True:
+                await self._sleep(warning_delay)
+                await notifier.send(format_holy_symbol_warning_message(user_id))
+                await self._sleep(self.warning_before_expiration_seconds)
+                await notifier.send(format_holy_symbol_expired_message(user_id))
+
+                current_timer = self._timers.get(key)
+                if current_timer and current_timer.task is asyncio.current_task():
+                    current_timer.expires_at = self._now() + self.duration_seconds
         except asyncio.CancelledError:
             raise
         except Exception:
