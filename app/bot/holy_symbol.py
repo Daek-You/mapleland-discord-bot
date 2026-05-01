@@ -26,10 +26,15 @@ from app.services.holy_symbol_timer_service import (
     format_holy_symbol_thread_close_message,
     format_holy_symbol_thread_start_message,
     format_holy_symbol_thread_stop_message,
+    format_holy_symbol_thread_unavailable_response,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+class HolySymbolThreadUnavailableError(Exception):
+    """Raised when the current channel cannot host a private timer thread."""
 
 
 class ThreadNotifier:
@@ -50,6 +55,23 @@ class ThreadNotifier:
             await self.thread.send(message)
         except (discord.NotFound, discord.HTTPException):
             logger.error("Failed to send Holy Symbol timer notification.", exc_info=True)
+
+    async def send_tts(self, message: str) -> None:
+        try:
+            await self.thread.send(message, tts=True)
+        except (discord.NotFound, discord.HTTPException):
+            logger.warning(
+                "Failed to send Holy Symbol timer TTS notification. "
+                "Falling back to a regular message.",
+                exc_info=True,
+            )
+            try:
+                await self.thread.send(message, tts=False)
+            except (discord.NotFound, discord.HTTPException):
+                logger.error(
+                    "Failed to send Holy Symbol timer TTS fallback notification.",
+                    exc_info=True,
+                )
 
     async def close(self, message: str) -> None:
         await self.send(format_holy_symbol_thread_close_message(message))
@@ -116,14 +138,17 @@ async def _create_private_thread(
 ) -> object:
     channel = interaction.channel
     if channel is None or not hasattr(channel, "create_thread"):
-        raise RuntimeError("알림을 보낼 채널을 찾을 수 없습니다.")
+        raise HolySymbolThreadUnavailableError
 
-    thread = await channel.create_thread(
-        name=_format_thread_name(interaction.user),
-        type=discord.ChannelType.private_thread,
-        invitable=False,
-    )
-    await thread.add_user(interaction.user)
+    try:
+        thread = await channel.create_thread(
+            name=_format_thread_name(interaction.user),
+            type=discord.ChannelType.private_thread,
+            invitable=False,
+        )
+        await thread.add_user(interaction.user)
+    except discord.Forbidden as exc:
+        raise HolySymbolThreadUnavailableError from exc
     return thread
 
 
@@ -174,6 +199,12 @@ def register_holy_symbol_commands(
             )
             await interaction.response.send_message(
                 format_holy_symbol_start_response(restarted),
+                ephemeral=True,
+            )
+        except HolySymbolThreadUnavailableError:
+            logger.warning("Holy Symbol timer thread cannot be created in this channel.")
+            await interaction.response.send_message(
+                format_holy_symbol_thread_unavailable_response(),
                 ephemeral=True,
             )
         except discord.HTTPException:

@@ -163,6 +163,28 @@ Check production container status:
 docker compose -f docker-compose.prod.yml ps app
 ```
 
+## Holy Symbol Timer TTS
+
+Holy Symbol timer reminders are sent only to the user's private timer thread as Discord chat TTS messages. The bot does not join voice channels.
+
+To hear voice reminders, enable Discord's setting for allowing playback and use of `/tts` commands:
+
+```text
+User Settings -> Notifications -> Advanced -> Allow playback and usage of /tts command
+```
+
+The "Read all messages aloud" option does not need to be enabled. To hear the voice reminder, keep the timer thread channel open in Discord.
+
+For more natural playback, users can adjust:
+
+```text
+Accessibility -> Audio and Screen Reader -> Text-to-Speech Rate
+```
+
+Known Holy Symbol timer error cases:
+
+* If `/홀심시작` returns "현재 채널에는 메랜도우미가 없어요. 메랜도우미가 있는 채널에서 다시 시도해주세요.", the bot cannot create the private timer thread in the current channel. Run the command in a channel where the bot is present and has permission to create private threads.
+
 ## Logs
 
 Container logs:

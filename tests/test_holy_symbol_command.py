@@ -8,7 +8,11 @@ from app.bot.holy_symbol_command_config import (
     HOLY_SYMBOL_STATUS_COMMAND,
     HOLY_SYMBOL_STOP_COMMAND,
 )
-from app.services.holy_symbol_timer_service import HolySymbolTimerService
+from app.services.holy_symbol_timer_service import (
+    HolySymbolTimerService,
+    format_holy_symbol_thread_unavailable_response,
+    format_holy_symbol_tts_notice,
+)
 
 
 class FakeResponse:
@@ -33,14 +37,16 @@ class FakeThread:
         self.id = thread_id
         self.name = name
         self.messages: list[str] = []
+        self.sent_messages: list[tuple[str, bool | None]] = []
         self.added_users: list[FakeUser] = []
         self.deleted = False
 
     async def add_user(self, user: FakeUser) -> None:
         self.added_users.append(user)
 
-    async def send(self, message: str) -> None:
+    async def send(self, message: str, **kwargs) -> None:
         self.messages.append(message)
+        self.sent_messages.append((message, kwargs.get("tts")))
 
     async def delete(self) -> None:
         self.deleted = True
@@ -56,6 +62,10 @@ class FakeChannel:
         self.next_thread_id += 1
         self.threads.append(thread)
         return thread
+
+
+class FakeUnavailableChannel:
+    pass
 
 
 class FakeClient:
@@ -120,7 +130,9 @@ def test_holy_symbol_start_command_starts_timer_with_ephemeral_response() -> Non
             interaction
         )
 
-        assert interaction.response.message == "홀심 타이머를 시작했습니다."
+        assert interaction.response.message == (
+            f"홀심 타이머를 시작했습니다.\n\n{format_holy_symbol_tts_notice()}"
+        )
         assert interaction.response.ephemeral is True
         assert service.get_holy_symbol_remaining_seconds(1, 10) is not None
         assert len(interaction.channel.threads) == 1
@@ -129,6 +141,58 @@ def test_holy_symbol_start_command_starts_timer_with_ephemeral_response() -> Non
         assert thread.added_users == [interaction.user]
         assert thread.messages == ["홀심 타이머 시작 (100초)"]
         service.cancel_all()
+
+    asyncio.run(run_test())
+
+
+def test_holy_symbol_start_command_handles_unavailable_channel() -> None:
+    async def run_test() -> None:
+        command_tree = FakeCommandTree()
+        interaction = FakeInteraction()
+        interaction.channel = FakeUnavailableChannel()
+        service = HolySymbolTimerService()
+        register_holy_symbol_commands(command_tree, service)
+
+        await command_tree.commands[HOLY_SYMBOL_START_COMMAND.name]["callback"](
+            interaction
+        )
+
+        assert (
+            interaction.response.message
+            == format_holy_symbol_thread_unavailable_response()
+        )
+        assert interaction.response.ephemeral is True
+        assert service.get_holy_symbol_remaining_seconds(1, 10) is None
+
+    asyncio.run(run_test())
+
+
+def test_holy_symbol_start_command_handles_missing_thread_permission() -> None:
+    class FakeResponseForForbidden:
+        status = 403
+        reason = "Forbidden"
+
+    class ForbiddenThreadChannel(FakeChannel):
+        async def create_thread(self, **kwargs) -> FakeThread:
+            raise discord.Forbidden(FakeResponseForForbidden(), "missing permissions")
+
+    async def run_test() -> None:
+        command_tree = FakeCommandTree()
+        interaction = FakeInteraction()
+        interaction.channel = ForbiddenThreadChannel()
+        service = HolySymbolTimerService()
+        register_holy_symbol_commands(command_tree, service)
+
+        await command_tree.commands[HOLY_SYMBOL_START_COMMAND.name]["callback"](
+            interaction
+        )
+
+        assert (
+            interaction.response.message
+            == format_holy_symbol_thread_unavailable_response()
+        )
+        assert interaction.response.ephemeral is True
+        assert service.get_holy_symbol_remaining_seconds(1, 10) is None
 
     asyncio.run(run_test())
 
@@ -229,6 +293,54 @@ def test_thread_notifier_logs_missing_delete_permission() -> None:
     asyncio.run(run_test())
 
 
+def test_thread_notifier_sends_tts_notification() -> None:
+    async def run_test() -> None:
+        thread = FakeThread(1000, "timer")
+        notifier = ThreadNotifier(thread, delete_delay_seconds=0)
+
+        await notifier.send_tts("홀심 10초 남음")
+
+        assert thread.sent_messages == [("홀심 10초 남음", True)]
+
+    asyncio.run(run_test())
+
+
+def test_thread_notifier_falls_back_when_tts_send_fails() -> None:
+    class FakeResponseForHttpException:
+        status = 500
+        reason = "Server Error"
+
+    class FailingTtsThread(FakeThread):
+        async def send(self, message: str, **kwargs) -> None:
+            if kwargs.get("tts") is True:
+                raise discord.HTTPException(FakeResponseForHttpException(), "failed")
+            await super().send(message, **kwargs)
+
+    async def run_test() -> None:
+        thread = FailingTtsThread(1000, "timer")
+        notifier = ThreadNotifier(thread, delete_delay_seconds=0)
+
+        await notifier.send_tts("홀심 다시 사용")
+
+        assert thread.sent_messages == [("홀심 다시 사용", False)]
+
+    asyncio.run(run_test())
+
+
+def test_holy_symbol_timer_does_not_add_tts_notice_storage() -> None:
+    service = HolySymbolTimerService()
+    notifier = ThreadNotifier(FakeThread(1000, "timer"), delete_delay_seconds=0)
+
+    assert not any(
+        "tts" in name.lower() and isinstance(value, (set, dict))
+        for name, value in vars(service).items()
+    )
+    assert not any(
+        "tts" in name.lower() and isinstance(value, (set, dict))
+        for name, value in vars(notifier).items()
+    )
+
+
 def test_holy_symbol_stop_command_handles_missing_timer() -> None:
     async def run_test() -> None:
         command_tree = FakeCommandTree()
@@ -261,6 +373,7 @@ def test_holy_symbol_status_command_returns_remaining_time() -> None:
         )
 
         assert interaction.response.message == "홀심 남은 시간: 1분 40초"
+        assert format_holy_symbol_tts_notice() not in interaction.response.message
         assert interaction.response.ephemeral is True
         service.cancel_all()
 
@@ -284,7 +397,9 @@ def test_holy_symbol_start_command_reuses_existing_thread() -> None:
             interaction
         )
 
-        assert interaction.response.message == "기존 홀심 타이머를 재시작했습니다."
+        assert interaction.response.message == (
+            f"기존 홀심 타이머를 재시작했습니다.\n\n{format_holy_symbol_tts_notice()}"
+        )
         assert len(interaction.channel.threads) == 1
         assert service.get_holy_symbol_timer(1, 10).thread_id == first_thread.id
         assert first_thread.messages == [
@@ -334,7 +449,9 @@ def test_holy_symbol_start_command_creates_new_thread_when_existing_is_missing()
             interaction
         )
 
-        assert interaction.response.message == "기존 홀심 타이머를 재시작했습니다."
+        assert interaction.response.message == (
+            f"기존 홀심 타이머를 재시작했습니다.\n\n{format_holy_symbol_tts_notice()}"
+        )
         assert len(interaction.channel.threads) == 1
         assert service.get_holy_symbol_timer(1, 10).thread_id == 1000
         service.cancel_all()
@@ -354,6 +471,7 @@ def test_holy_symbol_status_command_handles_missing_timer() -> None:
         )
 
         assert interaction.response.message == "실행 중인 홀심 타이머가 없습니다."
+        assert format_holy_symbol_tts_notice() not in interaction.response.message
         assert interaction.response.ephemeral is True
 
     asyncio.run(run_test())

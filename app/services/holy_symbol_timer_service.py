@@ -33,6 +33,9 @@ class TimerNotifier(Protocol):
     async def send(self, message: str) -> None:
         """Send a timer notification."""
 
+    async def send_tts(self, message: str) -> None:
+        """Send a timer notification as Discord chat TTS."""
+
     async def close(self, message: str) -> None:
         """Send a closing notification and clean up notifier resources."""
 
@@ -66,9 +69,32 @@ class HolySymbolTimerSnapshot:
 
 def format_holy_symbol_start_response(restarted: bool) -> str:
     """Return the /홀심시작 response."""
+    tts_notice = format_holy_symbol_tts_notice()
     if restarted:
-        return "기존 홀심 타이머를 재시작했습니다."
-    return "홀심 타이머를 시작했습니다."
+        return f"기존 홀심 타이머를 재시작했습니다.\n\n{tts_notice}"
+    return f"홀심 타이머를 시작했습니다.\n\n{tts_notice}"
+
+
+def format_holy_symbol_tts_notice() -> str:
+    """Return the TTS setting notice for /홀심시작."""
+    return (
+        "🔊 음성 알림을 들으려면:\n"
+        "사용자 설정 → 알림 → 고급 → "
+        "‘/tts 명령어의 재생 및 사용을 허용하기’를 켜주세요.\n\n"
+        "음성 알림을 받으려면 타이머 스레드 채널을 보고 있어야 합니다.\n\n"
+        "※ ‘모든 메시지를 음성으로 읽기’ 옵션은 켜지 않아도 됩니다.\n\n"
+        "그리고 더 자연스럽게 들으려면:\n"
+        "접근성 → 오디오 및 스크린 리더 → "
+        "“텍스트 음성 변환(TTS) 속도”를 좀 더 빠르게 설정해주세요."
+    )
+
+
+def format_holy_symbol_thread_unavailable_response() -> str:
+    """Return the /홀심시작 response when the bot cannot create a timer thread."""
+    return (
+        "현재 채널에는 메랜도우미가 없어요. "
+        "메랜도우미가 있는 채널에서 다시 시도해주세요."
+    )
 
 
 def format_holy_symbol_stop_response(stopped: bool) -> str:
@@ -120,12 +146,22 @@ def format_remaining_time(total_seconds: int) -> str:
 
 def format_holy_symbol_warning_message() -> str:
     """Return the private thread warning notification."""
-    return "🔔 홀심 10초 남음"
+    return "홀심 10초 남음"
+
+
+def format_holy_symbol_warning_tts_message() -> str:
+    """Return the private thread warning notification for TTS."""
+    return format_holy_symbol_warning_message()
 
 
 def format_holy_symbol_expired_message() -> str:
     """Return the private thread expiration notification."""
-    return "✨ 홀심 다시 사용!"
+    return "홀심 다시 사용"
+
+
+def format_holy_symbol_expired_tts_message() -> str:
+    """Return the private thread expiration notification for TTS."""
+    return format_holy_symbol_expired_message()
 
 
 class HolySymbolTimerService:
@@ -227,9 +263,9 @@ class HolySymbolTimerService:
             )
             while True:
                 await self._sleep(warning_delay)
-                await notifier.send(format_holy_symbol_warning_message())
+                await notifier.send_tts(format_holy_symbol_warning_tts_message())
                 await self._sleep(self.warning_before_expiration_seconds)
-                await notifier.send(format_holy_symbol_expired_message())
+                await notifier.send_tts(format_holy_symbol_expired_tts_message())
 
                 current_timer = self._timers.get(key)
                 if current_timer and current_timer.task is asyncio.current_task():

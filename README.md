@@ -21,8 +21,10 @@ Holy Symbol timer commands:
 
 The timer runs for 100 seconds until stopped. Reminders are sent only to the
 user's private timer thread, 10 seconds before expiration and at expiration.
+Timer reminders are sent as Discord chat TTS messages in the same private
+thread. See [docs/operations.md](docs/operations.md) for TTS settings and known
+timer error cases.
 
 TODO:
 
-* TTS notifications
 * Additional buff timers
