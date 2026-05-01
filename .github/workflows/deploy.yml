@@ -1,0 +1,34 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy on self-hosted Windows runner
+    runs-on:
+      - self-hosted
+      - Windows
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Deploy bot
+        shell: powershell
+        env:
+          APP_ENV: production
+          DISCORD_DEPLOY_WEBHOOK_URL: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          PRODUCTION_PROJECT_ROOT: ${{ vars.PRODUCTION_PROJECT_ROOT }}
+        run: |
+          $projectRoot = if ($env:PRODUCTION_PROJECT_ROOT) { $env:PRODUCTION_PROJECT_ROOT } else { $PWD.Path }
+          .\scripts\deploy.ps1 -ProjectRoot $projectRoot
