@@ -91,6 +91,19 @@ class SqliteFeedRepository:
                 revision_id=revision_id,
             )
 
+    def has_items(self, *, source: str, category: str) -> bool:
+        """Return whether this source category has already established a baseline."""
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM feed_items
+                WHERE source = ? AND category = ?
+                LIMIT 1
+                """,
+                (source, category),
+            ).fetchone()
+        return row is not None
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
         connection.execute("PRAGMA foreign_keys = ON")
@@ -183,3 +196,8 @@ class SqliteFeedRepository:
                 item_id,
             ),
         )
+
+
+def create_default_feed_repository() -> SqliteFeedRepository:
+    """Create the configured normalized feed repository."""
+    return SqliteFeedRepository()

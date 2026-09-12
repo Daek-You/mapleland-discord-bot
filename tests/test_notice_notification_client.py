@@ -150,6 +150,9 @@ def test_notice_notification_uses_shared_http_client(monkeypatch) -> None:
         http_client = shared_http_client
         notice_repository = object()
 
+        async def collect_latest_feed_notices(self) -> None:
+            return None
+
         def get_channel(self, channel_id: int):
             return object()
 

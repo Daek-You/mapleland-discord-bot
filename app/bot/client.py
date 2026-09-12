@@ -22,10 +22,12 @@ from app.config import (
 from app.crawler.mapleland import fetch_latest_notice_items
 from app.crawler.maplenote import fetch_monster_detail, search_monster_summaries
 from app.db.delivery_repository import DeliveryRecord, create_default_delivery_repository
+from app.db.feed_repository import create_default_feed_repository
 from app.db.notice_repository import create_default_notice_repository
 from app.db.subscription_repository import create_default_subscription_repository
 from app.http_client import create_shared_http_client
 from app.services.delivery_service import PermanentDeliveryError, dispatch_ready_deliveries
+from app.services.feed_ingestion_service import collect_notice_feed_updates
 from app.services.holy_symbol_timer_service import HolySymbolTimerService
 from app.services.notification_service import (
     collect_new_notice_notifications,
@@ -44,6 +46,7 @@ class MapleLandDiscordClient(discord.Client):
         self.http_client = create_shared_http_client()
         self.notice_repository = create_default_notice_repository()
         self.delivery_repository = create_default_delivery_repository()
+        self.feed_repository = create_default_feed_repository()
         self.subscription_repository = create_default_subscription_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
         self.delivery_dispatch_task: asyncio.Task[None] | None = None
@@ -145,6 +148,7 @@ class MapleLandDiscordClient(discord.Client):
 
     async def send_new_notice_notifications(self) -> None:
         """Send newly detected notice notifications to the configured channel."""
+        await self.collect_latest_feed_notices()
         channel_id = get_notice_channel_id()
         if not channel_id:
             logger.info("NOTICE_CHANNEL_ID is not set. Skipping notice notification.")
@@ -170,6 +174,18 @@ class MapleLandDiscordClient(discord.Client):
                 await channel.send(format_notice_notification(notification))
             except discord.HTTPException:
                 logger.error("Failed to send notice notification.", exc_info=True)
+
+    async def collect_latest_feed_notices(self) -> None:
+        """Collect official notices into the normalized feed and delivery queue."""
+        await collect_notice_feed_updates(
+            fetch_notice_items=partial(
+                fetch_latest_notice_items,
+                client=self.http_client,
+            ),
+            feed_repository=self.feed_repository,
+            subscription_repository=self.subscription_repository,
+            delivery_repository=self.delivery_repository,
+        )
 
     async def _run_delivery_dispatch_loop(self) -> None:
         """Dispatch queued feed revisions after the client becomes ready."""
