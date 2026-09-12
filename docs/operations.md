@@ -58,6 +58,20 @@ uv run --locked python -m app.main
 The default `docker-compose.yml` command remains available for deployment-image
 verification, while production continues to use `docker-compose.prod.yml`.
 
+## SQLite Migrations and Backups
+
+The repository applies numbered SQL files from `app/db/migrations` when it opens the
+database. Applied versions are recorded in `schema_migrations`, so each migration runs
+only once.
+
+When an existing database has a pending migration, a consistent copy is created with
+SQLite's backup API before any schema change. By default, backups are stored next to
+the database under `backups/` with a UTC timestamp in the filename.
+
+To restore a backup, stop the bot first, preserve the failed database for diagnosis,
+copy the selected backup to `NOTICE_DATABASE_PATH`, and restart the bot. Never replace
+a live database file while the process is running.
+
 ## CI Runner
 
 `.github/workflows/ci.yml` runs tests on GitHub-hosted `ubuntu-latest`.

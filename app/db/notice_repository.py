@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
 
 from app.config import DEFAULT_NOTICE_DATABASE_PATH, get_notice_database_path
+from app.db.migration_runner import apply_migrations
 
 
 @dataclass(frozen=True)
@@ -46,24 +46,7 @@ class SqliteNoticeRepository:
             return cursor.fetchone() is not None
 
     def _ensure_database(self) -> None:
-        database_file = Path(self.database_path)
-        if database_file.parent != Path("."):
-            database_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS notices (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source TEXT NOT NULL,
-                    external_id TEXT NOT NULL UNIQUE,
-                    title TEXT NOT NULL,
-                    url TEXT NOT NULL UNIQUE,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            connection.commit()
+        apply_migrations(self.database_path)
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.database_path)
