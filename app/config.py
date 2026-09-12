@@ -5,6 +5,7 @@ This module keeps safe defaults and environment keys in one place.
 """
 
 import os
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 DISCORD_TOKEN_ENV_NAME = "DISCORD_TOKEN"
@@ -48,6 +49,7 @@ DEFAULT_LOG_BACKUP_COUNT = 5
 DEFAULT_APP_ENV = "development"
 DEFAULT_BOT_NAME = "mapleland-discord-bot"
 VALID_APP_ENVS = {"development", "production"}
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 def get_required_discord_token() -> str:
@@ -75,7 +77,17 @@ def get_notice_check_interval_seconds() -> int:
     raw_interval = os.getenv(NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME)
     if not raw_interval:
         return DEFAULT_NOTICE_CHECK_INTERVAL_SECONDS
-    return int(raw_interval)
+    try:
+        interval = int(raw_interval)
+    except ValueError as error:
+        raise RuntimeError(
+            f"{NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME} must be a positive integer."
+        ) from error
+    if interval <= 0:
+        raise RuntimeError(
+            f"{NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME} must be a positive integer."
+        )
+    return interval
 
 
 def get_notice_database_path() -> str:
@@ -116,3 +128,44 @@ def get_discord_alert_webhook_url() -> str | None:
 def get_discord_alert_channel_id() -> str | None:
     """Return the Discord channel id reserved for operational alerts."""
     return os.getenv(DISCORD_ALERT_CHANNEL_ID_ENV_NAME)
+
+
+def validate_runtime_config() -> None:
+    """Fail fast when required or structured runtime values are invalid."""
+    get_required_discord_token()
+    get_app_env()
+    get_notice_check_interval_seconds()
+
+    for environment_name in (
+        DISCORD_GUILD_ID_ENV_NAME,
+        NOTICE_CHANNEL_ID_ENV_NAME,
+        DISCORD_ALERT_CHANNEL_ID_ENV_NAME,
+    ):
+        _validate_optional_discord_id(environment_name)
+
+    log_level = get_log_level().upper()
+    if log_level not in VALID_LOG_LEVELS:
+        raise RuntimeError(
+            f"{LOG_LEVEL_ENV_NAME} must be one of: "
+            f"{', '.join(sorted(VALID_LOG_LEVELS))}."
+        )
+
+    timezone_name = get_log_timezone()
+    try:
+        ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as error:
+        raise RuntimeError(
+            f"{LOG_TIMEZONE_ENV_NAME} must be a valid IANA timezone name."
+        ) from error
+
+
+def _validate_optional_discord_id(environment_name: str) -> None:
+    raw_value = os.getenv(environment_name)
+    if not raw_value:
+        return
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise RuntimeError(f"{environment_name} must be a positive integer.") from error
+    if value <= 0:
+        raise RuntimeError(f"{environment_name} must be a positive integer.")

@@ -6,7 +6,7 @@ import logging
 from dotenv import load_dotenv
 
 from app.bot.client import MapleLandDiscordClient, create_discord_client
-from app.config import get_required_discord_token
+from app.config import get_required_discord_token, validate_runtime_config
 from app.logging_config import configure_logging
 from app.services.operational_notification_service import send_operational_notification
 
@@ -19,6 +19,7 @@ def main(
 ) -> None:
     """Start the Discord bot."""
     load_dotenv()
+    validate_runtime_config()
     configure_logging()
     send_operational_notification("봇이 시작되는 중이에요.")
 

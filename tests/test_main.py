@@ -1,6 +1,10 @@
 import pytest
 
-from app.config import DISCORD_TOKEN_ENV_NAME, get_required_discord_token
+from app.config import (
+    DISCORD_TOKEN_ENV_NAME,
+    NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME,
+    get_required_discord_token,
+)
 from app.main import main
 
 
@@ -33,3 +37,22 @@ def test_main_runs_discord_client(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert main(lambda: client) is None
     assert client.token == "test-token"
+
+
+def test_main_rejects_invalid_config_before_creating_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client_factory_called = False
+
+    def client_factory() -> FakeDiscordClient:
+        nonlocal client_factory_called
+        client_factory_called = True
+        return FakeDiscordClient()
+
+    monkeypatch.setenv(DISCORD_TOKEN_ENV_NAME, "test-token")
+    monkeypatch.setenv(NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME, "0")
+
+    with pytest.raises(RuntimeError, match=NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME):
+        main(client_factory)
+
+    assert client_factory_called is False
