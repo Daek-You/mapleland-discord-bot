@@ -17,6 +17,7 @@ class DeliveryStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     SENT = "sent"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,28 @@ class SqliteDeliveryRepository:
                     discord_message_id,
                     sent_at_value,
                     sent_at_value,
+                    delivery_id,
+                    DeliveryStatus.PROCESSING.value,
+                ),
+            )
+            connection.commit()
+        if cursor.rowcount != 1:
+            raise ValueError("delivery is not being processed")
+
+    def mark_failed(self, delivery_id: int, *, error_kind: str) -> None:
+        """Stop retrying a delivery that cannot succeed without configuration changes."""
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE deliveries
+                SET status = ?, lease_expires_at = NULL, last_error_kind = ?,
+                    updated_at = ?
+                WHERE id = ? AND status = ?
+                """,
+                (
+                    DeliveryStatus.FAILED.value,
+                    error_kind,
+                    _to_storage(datetime.now(UTC)),
                     delivery_id,
                     DeliveryStatus.PROCESSING.value,
                 ),

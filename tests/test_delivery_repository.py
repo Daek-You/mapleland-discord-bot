@@ -104,6 +104,21 @@ def test_mark_sent_finishes_processing_delivery(tmp_path) -> None:
     ) == []
 
 
+def test_mark_failed_stops_retrying_unrecoverable_delivery(tmp_path) -> None:
+    database_path = tmp_path / "delivery.sqlite3"
+    revision_id = make_revision_id(database_path)
+    repository = SqliteDeliveryRepository(str(database_path))
+    repository.enqueue(revision_id, "123")
+    now = datetime(2030, 9, 12, 10, 0, tzinfo=UTC)
+    delivery = repository.claim_ready(now, limit=10, lease_duration=timedelta(minutes=5))[0]
+
+    repository.mark_failed(delivery.id, error_kind="channel_not_found")
+
+    assert repository.claim_ready(
+        now + timedelta(days=1), limit=10, lease_duration=timedelta(minutes=5)
+    ) == []
+
+
 def test_enqueue_requires_existing_feed_revision(tmp_path) -> None:
     repository = SqliteDeliveryRepository(str(tmp_path / "delivery.sqlite3"))
 
