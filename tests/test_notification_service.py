@@ -88,6 +88,53 @@ def test_collect_new_notice_notifications_initializes_empty_repository_without_n
     assert [notice.external_id for notice in repository.saved_notices] == ["100", "101"]
 
 
+def test_collect_notice_notifications_suppresses_backlog_on_runtime_start() -> None:
+    repository = FakeNoticeRepository()
+    repository.save_notice_if_new(
+        NoticeRecord(
+            title="Old stored notice",
+            url="https://maple.land/board/notices/99",
+            external_id="99",
+        )
+    )
+
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(
+                [NoticeItem(title="Backlog", url="https://maple.land/board/notices/100")]
+            ),
+            notice_repository=repository,
+            suppress_current_notifications=True,
+        )
+    )
+
+    assert notifications == []
+
+
+def test_collect_notice_notifications_returns_oldest_first_for_chat_order() -> None:
+    repository = FakeNoticeRepository()
+    repository.save_notice_if_new(
+        NoticeRecord(
+            title="Stored notice",
+            url="https://maple.land/board/notices/99",
+            external_id="99",
+        )
+    )
+    newest_first_items = [
+        NoticeItem(title="Newest", url="https://maple.land/board/notices/102"),
+        NoticeItem(title="Older", url="https://maple.land/board/notices/101"),
+    ]
+
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(newest_first_items),
+            notice_repository=repository,
+        )
+    )
+
+    assert [notification.title for notification in notifications] == ["Older", "Newest"]
+
+
 def test_collect_new_notice_notifications_prevents_duplicate_by_url() -> None:
     repository = FakeNoticeRepository()
     repository.save_notice_if_new(

@@ -149,6 +149,7 @@ def test_notice_notification_uses_shared_http_client(monkeypatch) -> None:
     class LoopHarness:
         http_client = shared_http_client
         notice_repository = object()
+        notice_notification_initialized = False
 
         async def collect_latest_feed_updates(self) -> None:
             return None

@@ -41,12 +41,16 @@ async def collect_new_notice_notifications(
     fetch_notice_items: Callable[[], Awaitable[list[NoticeItem]]] = fetch_latest_notice_items,
     notice_repository: NoticeRepository | None = None,
     suppress_initial_notifications: bool = True,
+    suppress_current_notifications: bool = False,
+    raise_on_fetch_error: bool = False,
 ) -> list[NoticeNotification]:
     """Return notifications for notices that have not been stored yet."""
     try:
         notice_items = await fetch_notice_items()
     except MaplelandCrawlerError:
         logger.error("Failed to fetch Mapleland notices for notification.", exc_info=True)
+        if raise_on_fetch_error:
+            raise
         return []
 
     repository = notice_repository
@@ -58,6 +62,7 @@ async def collect_new_notice_notifications(
         notice_items,
         repository,
         suppress_initial_notifications,
+        suppress_current_notifications,
     )
 
 
@@ -65,9 +70,13 @@ def _collect_notice_notifications(
     notice_items: list[NoticeItem],
     repository: NoticeRepository,
     suppress_initial_notifications: bool,
+    suppress_current_notifications: bool,
 ) -> list[NoticeNotification]:
     """Persist fetched notices without blocking the Discord event loop."""
-    should_notify = not suppress_initial_notifications or repository.has_saved_notices()
+    should_notify = (
+        not suppress_current_notifications
+        and (not suppress_initial_notifications or repository.has_saved_notices())
+    )
     notifications: list[NoticeNotification] = []
     for notice_item in notice_items:
         notice_record = NoticeRecord(
@@ -81,7 +90,7 @@ def _collect_notice_notifications(
                 NoticeNotification(title=notice_item.title, url=notice_item.url)
             )
 
-    return notifications
+    return list(reversed(notifications))
 
 
 async def collect_test_notice_notifications(

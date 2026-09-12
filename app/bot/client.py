@@ -54,6 +54,7 @@ class MapleLandDiscordClient(discord.Client):
         self.feed_repository = create_default_feed_repository()
         self.subscription_repository = create_default_subscription_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
+        self.notice_notification_initialized = False
         self.delivery_dispatch_task: asyncio.Task[None] | None = None
         self.holy_symbol_timer_service = HolySymbolTimerService()
 
@@ -174,7 +175,10 @@ class MapleLandDiscordClient(discord.Client):
                 client=self.http_client,
             ),
             notice_repository=self.notice_repository,
+            suppress_current_notifications=not self.notice_notification_initialized,
+            raise_on_fetch_error=True,
         )
+        self.notice_notification_initialized = True
         for notification in notifications:
             try:
                 await channel.send(format_notice_notification(notification))
