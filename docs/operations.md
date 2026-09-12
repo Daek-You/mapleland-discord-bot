@@ -88,6 +88,9 @@ Install these on the production Windows PC:
 * Docker Desktop
 * GitHub Actions self-hosted runner
 
+Keep the self-hosted GitHub Actions runner at version `2.327.1` or newer so Actions
+that use the Node.js 24 runtime, including `actions/checkout@v5`, can run correctly.
+
 Python and uv do not need to be installed on the Windows host. They run inside the Docker image.
 
 Enable Docker Desktop's start-on-login option so containers can come back after Windows restarts.
