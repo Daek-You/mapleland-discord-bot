@@ -7,6 +7,7 @@ from functools import partial
 import discord
 from discord import app_commands
 
+from app.bot.feed import register_feed_commands
 from app.bot.feed_subscription import register_feed_subscription_commands
 from app.bot.holy_symbol import register_holy_symbol_commands
 from app.bot.monster import register_monster_command
@@ -87,6 +88,7 @@ class MapleLandDiscordClient(discord.Client):
             self.command_tree,
             self.subscription_repository,
         )
+        register_feed_commands(self.command_tree, self.feed_repository)
         guild_id = get_discord_guild_id()
         if guild_id:
             guild = discord.Object(id=int(guild_id))

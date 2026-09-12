@@ -43,6 +43,15 @@ class FeedSaveResult:
     revision_id: int | None
 
 
+@dataclass(frozen=True)
+class FeedSummary:
+    """Current feed item fields needed for Discord list responses."""
+
+    category: str
+    title: str
+    url: str
+
+
 class SqliteFeedRepository:
     """Store feed items and append a revision whenever their content changes."""
 
@@ -103,6 +112,21 @@ class SqliteFeedRepository:
                 (source, category),
             ).fetchone()
         return row is not None
+
+    def list_latest(self, *, category: str, limit: int) -> list[FeedSummary]:
+        """Return the latest active items for one feed category."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT category, title, url
+                FROM feed_items
+                WHERE category = ? AND status = 'active'
+                ORDER BY COALESCE(source_updated_at, published_at, last_checked_at) DESC, id DESC
+                LIMIT ?
+                """,
+                (category, limit),
+            ).fetchall()
+        return [FeedSummary(*row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
