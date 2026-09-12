@@ -10,6 +10,7 @@
 ## 2. Testing Tool
 
 * pytest
+* Ruff
 * Run pytest locally with uv for the normal development loop
 * Use Docker separately when deployment compatibility must be verified
 
@@ -45,10 +46,12 @@ Design → Test → Implement → Verify → Refactor → Test Again
 ### Required Verification Command
 
 ```powershell
+uv run --locked ruff check app tests
 uv run --locked pytest -p no:cacheprovider -v
 ```
 
-The project `.python-version` selects Python 3.11, and `uv.lock` provides the same
+Ruff checks imports, common Python defects, and unsafe asynchronous patterns. The
+project `.python-version` selects Python 3.11, and `uv.lock` provides the same
 resolved dependency versions on local machines and in Docker. The `--locked` option
 fails instead of silently changing the lockfile.
 

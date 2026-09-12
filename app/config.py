@@ -7,7 +7,6 @@ This module keeps safe defaults and environment keys in one place.
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-
 DISCORD_TOKEN_ENV_NAME = "DISCORD_TOKEN"
 DISCORD_GUILD_ID_ENV_NAME = "DISCORD_GUILD_ID"
 NOTICE_CHANNEL_ID_ENV_NAME = "NOTICE_CHANNEL_ID"

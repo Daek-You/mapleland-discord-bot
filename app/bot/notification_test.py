@@ -11,7 +11,6 @@ from app.services.notification_service import (
     format_notice_notification,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

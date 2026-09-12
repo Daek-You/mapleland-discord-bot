@@ -10,7 +10,6 @@ from app.bot.command_config import NOTICE_COMMAND
 from app.crawler.mapleland import NoticeItem, fetch_latest_notice_items
 from app.services.notice_service import get_latest_notice_message
 
-
 logger = logging.getLogger(__name__)
 
 

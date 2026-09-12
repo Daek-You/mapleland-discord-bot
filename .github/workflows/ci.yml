@@ -16,5 +16,8 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Run Ruff
+        run: docker compose run --rm app uv run ruff check app tests
+
       - name: Run tests
         run: docker compose run --rm app uv run pytest -v

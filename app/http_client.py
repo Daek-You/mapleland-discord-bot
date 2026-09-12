@@ -2,7 +2,6 @@
 
 import httpx
 
-
 DEFAULT_HTTP_USER_AGENT = (
     "mapleland-discord-bot/0.1 "
     "(+https://github.com/Daek-You/mapleland-discord-bot)"

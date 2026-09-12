@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -10,6 +9,7 @@ def test_ci_workflow_runs_tests_on_github_hosted_runner() -> None:
     )
 
     assert "ubuntu-latest" in workflow
+    assert "uv run ruff check app tests" in workflow
     assert "docker compose run --rm app uv run pytest -v" in workflow
 
 

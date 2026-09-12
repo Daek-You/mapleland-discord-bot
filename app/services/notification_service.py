@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem, fetch_latest_notice_items
 from app.db.notice_repository import NoticeRecord, create_default_notice_repository
 
-
 logger = logging.getLogger(__name__)
 
 NOTICE_SOURCE = "mapleland"

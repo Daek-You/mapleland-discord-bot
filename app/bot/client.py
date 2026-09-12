@@ -9,8 +9,8 @@ from discord import app_commands
 
 from app.bot.holy_symbol import register_holy_symbol_commands
 from app.bot.monster import register_monster_command
-from app.bot.notification_test import register_notification_test_command
 from app.bot.notice import register_notice_command
+from app.bot.notification_test import register_notification_test_command
 from app.bot.ping import register_ping_command
 from app.config import (
     get_discord_guild_id,
@@ -26,7 +26,6 @@ from app.services.notification_service import (
     collect_new_notice_notifications,
     format_notice_notification,
 )
-
 
 logger = logging.getLogger(__name__)
 

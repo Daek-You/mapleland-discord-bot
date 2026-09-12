@@ -14,7 +14,6 @@ from app.config import (
     get_notice_database_path,
 )
 
-
 TEST_NOTICE_CHECK_INTERVAL_SECONDS = 30
 
 

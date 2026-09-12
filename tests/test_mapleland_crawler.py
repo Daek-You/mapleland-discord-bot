@@ -11,7 +11,6 @@ from app.crawler.mapleland import (
     parse_notice_items,
 )
 
-
 NOTICE_LIST_HTML = """
 <html>
   <body>

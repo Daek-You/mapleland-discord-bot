@@ -20,7 +20,6 @@ from app.crawler.maplenote import (
     search_monster_summaries,
 )
 
-
 MONSTER_SEARCH_EMPTY_MESSAGE = "검색 결과가 없습니다."
 MONSTER_SEARCH_FAILURE_MESSAGE = "몬스터 정보를 가져오지 못했습니다. 잠시 후 다시 시도해주세요."
 MONSTER_CANDIDATE_HEADER = "**검색 후보**"

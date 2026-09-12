@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from enum import Enum
 import logging
 import math
 import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from enum import Enum
 from typing import Protocol
 
 from app.config import (
@@ -16,7 +16,6 @@ from app.config import (
     DEFAULT_HOLY_SYMBOL_TIMER_TYPE,
     DEFAULT_HOLY_SYMBOL_WARNING_BEFORE_EXPIRATION_SECONDS,
 )
-
 
 logger = logging.getLogger(__name__)
 

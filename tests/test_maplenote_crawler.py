@@ -16,7 +16,6 @@ from app.crawler.maplenote import (
     search_monster_summaries,
 )
 
-
 MONSTER_LIST_HTML = """
 <html>
   <body>

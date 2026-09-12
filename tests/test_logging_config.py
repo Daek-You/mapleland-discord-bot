@@ -3,7 +3,7 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
-from app.logging_config import configure_logging, _get_time_converter
+from app.logging_config import _get_time_converter, configure_logging
 
 
 def test_configure_logging_writes_warning_logs_to_utf8_rotating_file(tmp_path) -> None:

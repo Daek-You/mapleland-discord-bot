@@ -27,7 +27,6 @@ from app.services.monster_service import (
     get_monster_search_response,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

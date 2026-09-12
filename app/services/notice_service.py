@@ -6,7 +6,6 @@ from collections.abc import Awaitable, Callable
 from app.config import DEFAULT_NOTICE_DISPLAY_LIMIT
 from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem, fetch_latest_notice_items
 
-
 NOTICE_COMMAND_EMPTY_MESSAGE = "현재 가져올 수 있는 공지가 없습니다."
 NOTICE_COMMAND_FAILURE_MESSAGE = "공지사항을 가져오는 데 실패했습니다. 잠시 후 다시 시도해주세요."
 NOTICE_COMMAND_HEADER = "**📢 최신 메이플랜드 공지**"

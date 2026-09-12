@@ -1,6 +1,5 @@
-from pathlib import Path
 import tomllib
-
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -11,6 +10,16 @@ def test_pyproject_includes_pytest() -> None:
     dev_dependencies = pyproject["dependency-groups"]["dev"]
 
     assert any(dependency.startswith("pytest") for dependency in dev_dependencies)
+
+
+def test_pyproject_includes_ruff_and_async_rules() -> None:
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+
+    dev_dependencies = pyproject["dependency-groups"]["dev"]
+    selected_rules = pyproject["tool"]["ruff"]["lint"]["select"]
+
+    assert any(dependency.startswith("ruff") for dependency in dev_dependencies)
+    assert "ASYNC" in selected_rules
 
 
 def test_local_python_version_matches_docker_runtime() -> None:

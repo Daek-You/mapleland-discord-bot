@@ -29,7 +29,6 @@ from app.services.holy_symbol_timer_service import (
     format_holy_symbol_thread_unavailable_response,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
