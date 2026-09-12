@@ -7,6 +7,7 @@ from functools import partial
 import discord
 from discord import app_commands
 
+from app.bot.feed_subscription import register_feed_subscription_commands
 from app.bot.holy_symbol import register_holy_symbol_commands
 from app.bot.monster import register_monster_command
 from app.bot.notice import register_notice_command
@@ -22,6 +23,7 @@ from app.crawler.mapleland import fetch_latest_notice_items
 from app.crawler.maplenote import fetch_monster_detail, search_monster_summaries
 from app.db.delivery_repository import DeliveryRecord, create_default_delivery_repository
 from app.db.notice_repository import create_default_notice_repository
+from app.db.subscription_repository import create_default_subscription_repository
 from app.http_client import create_shared_http_client
 from app.services.delivery_service import PermanentDeliveryError, dispatch_ready_deliveries
 from app.services.holy_symbol_timer_service import HolySymbolTimerService
@@ -42,6 +44,7 @@ class MapleLandDiscordClient(discord.Client):
         self.http_client = create_shared_http_client()
         self.notice_repository = create_default_notice_repository()
         self.delivery_repository = create_default_delivery_repository()
+        self.subscription_repository = create_default_subscription_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
         self.delivery_dispatch_task: asyncio.Task[None] | None = None
         self.holy_symbol_timer_service = HolySymbolTimerService()
@@ -92,6 +95,10 @@ class MapleLandDiscordClient(discord.Client):
         self.notice_notification_task = asyncio.create_task(
             self._run_notice_notification_loop(),
             name="notice-notification-loop",
+        )
+        register_feed_subscription_commands(
+            self.command_tree,
+            self.subscription_repository,
         )
         self.delivery_dispatch_task = asyncio.create_task(
             self._run_delivery_dispatch_loop(),

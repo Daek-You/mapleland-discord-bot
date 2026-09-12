@@ -72,3 +72,8 @@ class SqliteSubscriptionRepository:
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.database_path)
+
+
+def create_default_subscription_repository() -> SqliteSubscriptionRepository:
+    """Create the configured feed subscription repository."""
+    return SqliteSubscriptionRepository()

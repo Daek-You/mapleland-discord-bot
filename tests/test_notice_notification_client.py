@@ -112,6 +112,11 @@ def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
             "create_default_delivery_repository",
             lambda: object(),
         )
+        monkeypatch.setattr(
+            client_module,
+            "create_default_subscription_repository",
+            lambda: object(),
+        )
         http_client = FakeHttpClient()
         monkeypatch.setattr(
             client_module,
