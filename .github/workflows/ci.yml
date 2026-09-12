@@ -33,6 +33,12 @@ jobs:
       - name: Run tests
         run: uv run pytest -v
 
+      - name: Set up QEMU for ARM64 builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx container driver
+        uses: docker/setup-buildx-action@v3
+
       - name: Build production image for ARM64
         run: >-
           docker buildx build --platform linux/arm64
