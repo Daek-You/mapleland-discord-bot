@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -44,7 +46,7 @@ class FakeClient:
         self.request_error = request_error
         self.requested_url: str | None = None
 
-    def get(self, url: str) -> FakeResponse:
+    async def get(self, url: str) -> FakeResponse:
         self.requested_url = url
         if self.request_error:
             raise self.request_error
@@ -77,7 +79,7 @@ def test_parse_notice_items_returns_empty_list_for_unexpected_html() -> None:
 def test_fetch_latest_notice_items_uses_client_and_parses_response() -> None:
     client = FakeClient(response=FakeResponse(NOTICE_LIST_HTML))
 
-    notice_items = fetch_latest_notice_items(client=client)
+    notice_items = asyncio.run(fetch_latest_notice_items(client=client))
 
     assert client.requested_url == MAPLELAND_NOTICE_LIST_URL
     assert len(notice_items) == 2
@@ -87,7 +89,7 @@ def test_fetch_latest_notice_items_wraps_http_error() -> None:
     client = FakeClient(response=FakeResponse("server error", status_code=500))
 
     with pytest.raises(MaplelandCrawlerError, match="HTTP error"):
-        fetch_latest_notice_items(client=client)
+        asyncio.run(fetch_latest_notice_items(client=client))
 
 
 def test_fetch_latest_notice_items_wraps_network_error() -> None:
@@ -95,4 +97,4 @@ def test_fetch_latest_notice_items_wraps_network_error() -> None:
     client = FakeClient(request_error=httpx.ConnectError("connection failed", request=request))
 
     with pytest.raises(MaplelandCrawlerError, match="request"):
-        fetch_latest_notice_items(client=client)
+        asyncio.run(fetch_latest_notice_items(client=client))

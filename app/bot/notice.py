@@ -19,7 +19,8 @@ def register_notice_command(command_tree: app_commands.CommandTree) -> None:
     async def notice(interaction: discord.Interaction) -> None:
         logger.info("/공지 command executed.")
         try:
-            await interaction.response.send_message(get_latest_notice_message())
+            await interaction.response.defer(thinking=True)
+            await interaction.followup.send(await get_latest_notice_message())
         except discord.HTTPException:
             logger.error("Failed to send /공지 response.", exc_info=True)
             raise

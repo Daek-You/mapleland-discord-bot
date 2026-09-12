@@ -25,18 +25,21 @@ class NoticeItem:
     url: str
 
 
-def fetch_latest_notice_items(
+async def fetch_latest_notice_items(
     notice_list_url: str = MAPLELAND_NOTICE_LIST_URL,
-    client: httpx.Client | None = None,
+    client: httpx.AsyncClient | None = None,
 ) -> list[NoticeItem]:
     """Fetch latest Mapleland notice titles and URLs."""
     if client is None:
-        with httpx.Client(
+        async with httpx.AsyncClient(
             timeout=DEFAULT_MAPLELAND_REQUEST_TIMEOUT_SECONDS
         ) as default_client:
-            return _fetch_latest_notice_items_with_client(default_client, notice_list_url)
+            return await _fetch_latest_notice_items_with_client(
+                default_client,
+                notice_list_url,
+            )
 
-    return _fetch_latest_notice_items_with_client(client, notice_list_url)
+    return await _fetch_latest_notice_items_with_client(client, notice_list_url)
 
 
 def parse_notice_items(
@@ -67,12 +70,12 @@ def parse_notice_items(
     return notice_items
 
 
-def _fetch_latest_notice_items_with_client(
-    client: httpx.Client,
+async def _fetch_latest_notice_items_with_client(
+    client: httpx.AsyncClient,
     notice_list_url: str,
 ) -> list[NoticeItem]:
     try:
-        response = client.get(notice_list_url)
+        response = await client.get(notice_list_url)
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MaplelandCrawlerError("Mapleland notice page returned an HTTP error.") from error

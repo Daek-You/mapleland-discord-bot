@@ -1,7 +1,7 @@
 """Service logic for Mapleland notices."""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from app.config import DEFAULT_NOTICE_DISPLAY_LIMIT
 from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem, fetch_latest_notice_items
@@ -15,13 +15,13 @@ MARKDOWN_LINK_TEXT_SPECIAL_CHARACTERS = "\\[]"
 logger = logging.getLogger(__name__)
 
 
-def get_latest_notice_message(
-    fetch_notice_items: Callable[[], list[NoticeItem]] = fetch_latest_notice_items,
+async def get_latest_notice_message(
+    fetch_notice_items: Callable[[], Awaitable[list[NoticeItem]]] = fetch_latest_notice_items,
     display_limit: int = DEFAULT_NOTICE_DISPLAY_LIMIT,
 ) -> str:
     """Return a Discord-ready latest notices message."""
     try:
-        notice_items = fetch_notice_items()
+        notice_items = await fetch_notice_items()
     except MaplelandCrawlerError:
         logger.error("Failed to fetch Mapleland notices.", exc_info=True)
         return NOTICE_COMMAND_FAILURE_MESSAGE

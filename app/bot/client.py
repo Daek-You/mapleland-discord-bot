@@ -97,8 +97,7 @@ class MapleLandDiscordClient(discord.Client):
             logger.error("Failed to fetch notice notification channel.", exc_info=True)
             return
 
-        notifications = await asyncio.to_thread(
-            collect_new_notice_notifications,
+        notifications = await collect_new_notice_notifications(
             notice_repository=self.notice_repository,
         )
         for notification in notifications:

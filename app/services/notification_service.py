@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urlparse
@@ -37,20 +38,36 @@ class NoticeNotification:
     url: str
 
 
-def collect_new_notice_notifications(
-    fetch_notice_items: Callable[[], list[NoticeItem]] = fetch_latest_notice_items,
+async def collect_new_notice_notifications(
+    fetch_notice_items: Callable[[], Awaitable[list[NoticeItem]]] = fetch_latest_notice_items,
     notice_repository: NoticeRepository | None = None,
     suppress_initial_notifications: bool = True,
 ) -> list[NoticeNotification]:
     """Return notifications for notices that have not been stored yet."""
-    repository = notice_repository or create_default_notice_repository()
-
     try:
-        notice_items = fetch_notice_items()
+        notice_items = await fetch_notice_items()
     except MaplelandCrawlerError:
         logger.error("Failed to fetch Mapleland notices for notification.", exc_info=True)
         return []
 
+    repository = notice_repository
+    if repository is None:
+        repository = await asyncio.to_thread(create_default_notice_repository)
+
+    return await asyncio.to_thread(
+        _collect_notice_notifications,
+        notice_items,
+        repository,
+        suppress_initial_notifications,
+    )
+
+
+def _collect_notice_notifications(
+    notice_items: list[NoticeItem],
+    repository: NoticeRepository,
+    suppress_initial_notifications: bool,
+) -> list[NoticeNotification]:
+    """Persist fetched notices without blocking the Discord event loop."""
     should_notify = not suppress_initial_notifications or repository.has_saved_notices()
     notifications: list[NoticeNotification] = []
     for notice_item in notice_items:
@@ -68,7 +85,7 @@ def collect_new_notice_notifications(
     return notifications
 
 
-def collect_test_notice_notifications(
+async def collect_test_notice_notifications(
     unique_suffix: str,
     notice_repository: NoticeRepository | None = None,
 ) -> list[NoticeNotification]:
@@ -77,8 +94,11 @@ def collect_test_notice_notifications(
         title=TEST_NOTICE_TITLE,
         url=f"{TEST_NOTICE_URL}/{unique_suffix}",
     )
-    return collect_new_notice_notifications(
-        fetch_notice_items=lambda: [fake_notice],
+    async def fetch_fake_notice_items() -> list[NoticeItem]:
+        return [fake_notice]
+
+    return await collect_new_notice_notifications(
+        fetch_notice_items=fetch_fake_notice_items,
         notice_repository=notice_repository,
         suppress_initial_notifications=False,
     )
