@@ -51,6 +51,7 @@ def test_save_same_content_is_unchanged_without_extra_revision(tmp_path) -> None
     assert second_result == type(first_result)(
         item_id=first_result.item_id,
         change=FeedChange.UNCHANGED,
+        revision_id=None,
     )
     with sqlite3.connect(database_path) as connection:
         title = connection.execute("SELECT title FROM feed_items").fetchone()[0]

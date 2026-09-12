@@ -40,6 +40,7 @@ class FeedSaveResult:
 
     item_id: int
     change: FeedChange
+    revision_id: int | None
 
 
 class SqliteFeedRepository:
@@ -63,20 +64,32 @@ class SqliteFeedRepository:
 
             if existing is None:
                 item_id = self._insert_item(connection, item)
-                self._insert_revision(connection, item_id, item)
+                revision_id = self._insert_revision(connection, item_id, item)
                 connection.commit()
-                return FeedSaveResult(item_id=item_id, change=FeedChange.NEW)
+                return FeedSaveResult(
+                    item_id=item_id,
+                    change=FeedChange.NEW,
+                    revision_id=revision_id,
+                )
 
             item_id, stored_hash = existing
             if stored_hash == item.content_hash:
                 self._refresh_unchanged_item(connection, item_id, item)
                 connection.commit()
-                return FeedSaveResult(item_id=item_id, change=FeedChange.UNCHANGED)
+                return FeedSaveResult(
+                    item_id=item_id,
+                    change=FeedChange.UNCHANGED,
+                    revision_id=None,
+                )
 
             self._update_changed_item(connection, item_id, item)
-            self._insert_revision(connection, item_id, item)
+            revision_id = self._insert_revision(connection, item_id, item)
             connection.commit()
-            return FeedSaveResult(item_id=item_id, change=FeedChange.UPDATED)
+            return FeedSaveResult(
+                item_id=item_id,
+                change=FeedChange.UPDATED,
+                revision_id=revision_id,
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
@@ -112,14 +125,15 @@ class SqliteFeedRepository:
         connection: sqlite3.Connection,
         item_id: int,
         item: FeedItemRecord,
-    ) -> None:
-        connection.execute(
+    ) -> int:
+        cursor = connection.execute(
             """
             INSERT INTO feed_revisions (feed_item_id, content_hash, content)
             VALUES (?, ?, ?)
             """,
             (item_id, item.content_hash, item.content),
         )
+        return int(cursor.lastrowid)
 
     @staticmethod
     def _refresh_unchanged_item(
