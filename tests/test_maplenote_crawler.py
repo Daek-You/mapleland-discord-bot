@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -144,7 +146,7 @@ class FakeClient:
         self.requested_url: str | None = None
         self.requested_params: dict[str, str] | None = None
 
-    def get(self, url: str, params: dict[str, str] | None = None) -> FakeResponse:
+    async def get(self, url: str, params: dict[str, str] | None = None) -> FakeResponse:
         self.requested_url = url
         self.requested_params = params
         if self.request_error:
@@ -254,7 +256,7 @@ def test_parse_drop_items_falls_back_to_drop_slot_names() -> None:
 def test_search_monster_summaries_uses_query_param() -> None:
     client = FakeClient(response=FakeResponse(MONSTER_LIST_HTML))
 
-    summaries = search_monster_summaries("슬라임", client=client)
+    summaries = asyncio.run(search_monster_summaries("슬라임", client=client))
 
     assert client.requested_url == MAPLENOTE_MONSTER_LIST_URL
     assert client.requested_params == {"q": "슬라임"}
@@ -265,15 +267,19 @@ def test_fetch_monster_detail_wraps_http_error() -> None:
     client = FakeClient(response=FakeResponse("server error", status_code=500))
 
     with pytest.raises(MapleNoteCrawlerError, match="HTTP error"):
-        fetch_monster_detail("https://example.com/monster_card/1", client=client)
+        asyncio.run(
+            fetch_monster_detail("https://example.com/monster_card/1", client=client)
+        )
 
 
 def test_fetch_monster_detail_requests_full_detail_page_from_card_url() -> None:
     client = FakeClient(response=FakeResponse(MONSTER_FULL_DETAIL_HTML))
 
-    fetch_monster_detail(
-        "https://xn--o80b01o9mlw3kdzc.com/monster_card/210100",
-        client=client,
+    asyncio.run(
+        fetch_monster_detail(
+            "https://xn--o80b01o9mlw3kdzc.com/monster_card/210100",
+            client=client,
+        )
     )
 
     assert (
@@ -287,7 +293,7 @@ def test_search_monster_summaries_wraps_network_error() -> None:
     client = FakeClient(request_error=httpx.ConnectError("connection failed", request=request))
 
     with pytest.raises(MapleNoteCrawlerError, match="request"):
-        search_monster_summaries("슬라임", client=client)
+        asyncio.run(search_monster_summaries("슬라임", client=client))
 
 
 def test_parse_monster_detail_raises_error_for_unexpected_html() -> None:

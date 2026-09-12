@@ -23,6 +23,10 @@ class FakeResponse:
         self.view = None
         self.edited_embeds = None
         self.edited_view = None
+        self.deferred = False
+
+    async def defer(self, *, thinking: bool = False) -> None:
+        self.deferred = thinking
 
     async def send_message(self, message: str | None = None, **kwargs) -> None:
         self.message = message or kwargs.get("content")
@@ -47,18 +51,26 @@ class FakeMessage:
 
 
 class FakeFollowup:
-    def __init__(self) -> None:
+    def __init__(self, sent_message: FakeMessage) -> None:
+        self.message: str | None = None
+        self.embed = None
         self.embeds = None
+        self.view = None
+        self.sent_message = sent_message
 
-    async def send(self, **kwargs) -> None:
+    async def send(self, message: str | None = None, **kwargs) -> FakeMessage:
+        self.message = message or kwargs.get("content")
+        self.embed = kwargs.get("embed")
         self.embeds = kwargs.get("embeds")
+        self.view = kwargs.get("view")
+        return self.sent_message
 
 
 class FakeInteraction:
     def __init__(self) -> None:
         self.response = FakeResponse()
-        self.followup = FakeFollowup()
         self.message = FakeMessage(self.response)
+        self.followup = FakeFollowup(self.message)
 
     async def original_response(self) -> FakeMessage:
         return self.message
@@ -77,6 +89,13 @@ class FakeCommandTree:
             return callback
 
         return decorator
+
+
+def make_async_response(factory):
+    async def get_response(name: str) -> MonsterSearchResponse:
+        return factory(name)
+
+    return get_response
 
 
 def test_register_monster_command_registers_command() -> None:
@@ -99,14 +118,17 @@ def test_monster_command_sends_search_message(monkeypatch) -> None:
     monkeypatch.setattr(
         monster_command,
         "get_monster_search_response",
-        lambda name: MonsterSearchResponse(content=f"{name} 검색 결과"),
+        make_async_response(
+            lambda name: MonsterSearchResponse(content=f"{name} 검색 결과")
+        ),
     )
 
     register_monster_command(command_tree)
     asyncio.run(command_tree.commands[MONSTER_COMMAND.name]["callback"](interaction, "슬라임"))
 
-    assert interaction.response.message == "슬라임 검색 결과"
-    assert interaction.response.embed is None
+    assert interaction.response.deferred is True
+    assert interaction.followup.message == "슬라임 검색 결과"
+    assert interaction.followup.embed is None
 
 
 def test_monster_command_sends_embed_response(monkeypatch) -> None:
@@ -115,26 +137,29 @@ def test_monster_command_sends_embed_response(monkeypatch) -> None:
     monkeypatch.setattr(
         monster_command,
         "get_monster_search_response",
-        lambda name: MonsterSearchResponse(
-            embed=MonsterEmbedData(
-                title="슬라임",
-                description="몬스터 정보",
-                url="https://example.com/monster_card/210100",
-                thumbnail_url="https://example.com/slime.png",
-                fields=[
-                    MonsterEmbedField(name="기본 정보", value="LV: 6", inline=True),
-                ],
-                footer="메이플노트 클래식",
-            ),
+        make_async_response(
+            lambda name: MonsterSearchResponse(
+                embed=MonsterEmbedData(
+                    title="슬라임",
+                    description="몬스터 정보",
+                    url="https://example.com/monster_card/210100",
+                    thumbnail_url="https://example.com/slime.png",
+                    fields=[
+                        MonsterEmbedField(name="기본 정보", value="LV: 6", inline=True),
+                    ],
+                    footer="메이플노트 클래식",
+                ),
+            )
         ),
     )
 
     register_monster_command(command_tree)
     asyncio.run(command_tree.commands[MONSTER_COMMAND.name]["callback"](interaction, "슬라임"))
 
-    assert interaction.response.message is None
-    assert interaction.response.embed.title == "슬라임"
-    assert interaction.response.embed.url == "https://example.com/monster_card/210100"
+    assert interaction.response.deferred is True
+    assert interaction.followup.message is None
+    assert interaction.followup.embed.title == "슬라임"
+    assert interaction.followup.embed.url == "https://example.com/monster_card/210100"
     assert interaction.followup.embeds is None
 
 
@@ -144,18 +169,20 @@ def test_monster_drop_command_sends_drop_embeds(monkeypatch) -> None:
     monkeypatch.setattr(
         monster_command,
         "get_monster_drop_search_response",
-        lambda name: MonsterSearchResponse(
-            content=f"**{name} 주요 드랍 아이템**",
-            embeds=[
-                MonsterEmbedData(
-                    title="물컹물컹한 액체",
-                    description="드랍률: 40%",
-                    url="https://example.com/item_detail/4000004",
-                    thumbnail_url="https://example.com/item.png",
-                    fields=[],
-                    footer="",
-                )
-            ],
+        make_async_response(
+            lambda name: MonsterSearchResponse(
+                content=f"**{name} 주요 드랍 아이템**",
+                embeds=[
+                    MonsterEmbedData(
+                        title="물컹물컹한 액체",
+                        description="드랍률: 40%",
+                        url="https://example.com/item_detail/4000004",
+                        thumbnail_url="https://example.com/item.png",
+                        fields=[],
+                        footer="",
+                    )
+                ],
+            )
         ),
     )
 
@@ -164,8 +191,8 @@ def test_monster_drop_command_sends_drop_embeds(monkeypatch) -> None:
         command_tree.commands[MONSTER_DROP_COMMAND.name]["callback"](interaction, "슬라임")
     )
 
-    assert interaction.response.message == "**슬라임 주요 드랍 아이템**"
-    assert interaction.response.embeds[0].title == "물컹물컹한 액체"
+    assert interaction.followup.message == "**슬라임 주요 드랍 아이템**"
+    assert interaction.followup.embeds[0].title == "물컹물컹한 액체"
 
 
 def test_monster_drop_command_paginates_drop_embeds(monkeypatch) -> None:
@@ -174,17 +201,19 @@ def test_monster_drop_command_paginates_drop_embeds(monkeypatch) -> None:
     monkeypatch.setattr(
         monster_command,
         "get_monster_drop_search_response",
-        lambda name: MonsterSearchResponse(
-            content=f"**{name} 주요 드랍 아이템**",
-            drop_items=[
-                MonsterDropItem(
-                    name=f"아이템 {index}",
-                    drop_rate=f"{index}%",
-                    icon_url=f"https://example.com/item/{index}.png",
-                )
-                for index in range(1, 10)
-            ],
-            monster_detail_url="https://example.com/monster_card/210100",
+        make_async_response(
+            lambda name: MonsterSearchResponse(
+                content=f"**{name} 주요 드랍 아이템**",
+                drop_items=[
+                    MonsterDropItem(
+                        name=f"아이템 {index}",
+                        drop_rate=f"{index}%",
+                        icon_url=f"https://example.com/item/{index}.png",
+                    )
+                    for index in range(1, 10)
+                ],
+                monster_detail_url="https://example.com/monster_card/210100",
+            )
         ),
     )
 
@@ -193,15 +222,15 @@ def test_monster_drop_command_paginates_drop_embeds(monkeypatch) -> None:
         command_tree.commands[MONSTER_DROP_COMMAND.name]["callback"](interaction, "슬라임")
     )
 
-    assert interaction.response.message == "**슬라임 주요 드랍 아이템**\n조회 가능 시간: 3분"
-    assert len(interaction.response.embeds) == 7
-    assert interaction.response.embeds[0].title == "아이템 1"
-    assert interaction.response.embeds[-1].title == "아이템 7"
-    assert interaction.response.view is not None
-    assert interaction.response.view.total_pages == 2
-    assert interaction.response.view.children[0].disabled is True
-    assert interaction.response.view.children[1].label == "1 / 2"
-    assert interaction.response.view.children[2].disabled is False
+    assert interaction.followup.message == "**슬라임 주요 드랍 아이템**\n조회 가능 시간: 3분"
+    assert len(interaction.followup.embeds) == 7
+    assert interaction.followup.embeds[0].title == "아이템 1"
+    assert interaction.followup.embeds[-1].title == "아이템 7"
+    assert interaction.followup.view is not None
+    assert interaction.followup.view.total_pages == 2
+    assert interaction.followup.view.children[0].disabled is True
+    assert interaction.followup.view.children[1].label == "1 / 2"
+    assert interaction.followup.view.children[2].disabled is False
 
 
 def test_monster_drop_pagination_next_button_updates_message() -> None:
@@ -314,10 +343,12 @@ def test_monster_drop_command_omits_buttons_for_single_page(monkeypatch) -> None
     monkeypatch.setattr(
         monster_command,
         "get_monster_drop_search_response",
-        lambda name: MonsterSearchResponse(
-            content=f"**{name} 주요 드랍 아이템**",
-            drop_items=[MonsterDropItem(name="물컹물컹한 액체", drop_rate="")],
-            monster_detail_url="https://example.com/monster_card/210100",
+        make_async_response(
+            lambda name: MonsterSearchResponse(
+                content=f"**{name} 주요 드랍 아이템**",
+                drop_items=[MonsterDropItem(name="물컹물컹한 액체", drop_rate="")],
+                monster_detail_url="https://example.com/monster_card/210100",
+            )
         ),
     )
 
@@ -326,6 +357,6 @@ def test_monster_drop_command_omits_buttons_for_single_page(monkeypatch) -> None
         command_tree.commands[MONSTER_DROP_COMMAND.name]["callback"](interaction, "슬라임")
     )
 
-    assert len(interaction.response.embeds) == 1
-    assert interaction.response.embeds[0].description == "드랍률: 정보 없음"
-    assert interaction.response.view is None
+    assert len(interaction.followup.embeds) == 1
+    assert interaction.followup.embeds[0].description == "드랍률: 정보 없음"
+    assert interaction.followup.view is None

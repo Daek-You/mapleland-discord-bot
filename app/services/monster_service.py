@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.config import (
@@ -67,16 +67,16 @@ class MonsterSearchResponse:
     monster_detail_url: str | None = None
 
 
-def get_monster_search_response(
+async def get_monster_search_response(
     query: str,
-    search_summaries: Callable[[str], list[MonsterSummary]] = search_monster_summaries,
-    get_detail: Callable[[str], MonsterDetail] = fetch_monster_detail,
+    search_summaries: Callable[[str], Awaitable[list[MonsterSummary]]] = search_monster_summaries,
+    get_detail: Callable[[str], Awaitable[MonsterDetail]] = fetch_monster_detail,
     candidate_limit: int = DEFAULT_MONSTER_CANDIDATE_DISPLAY_LIMIT,
     drop_limit: int = DEFAULT_MONSTER_DROP_DISPLAY_LIMIT,
 ) -> MonsterSearchResponse:
     """Return a Discord-ready monster search response."""
     try:
-        result = search_monster(query, search_summaries, get_detail)
+        result = await search_monster(query, search_summaries, get_detail)
     except MapleNoteCrawlerError:
         logger.error("Failed to search MapleNote monster.", exc_info=True)
         return MonsterSearchResponse(content=MONSTER_SEARCH_FAILURE_MESSAGE)
@@ -97,16 +97,16 @@ def get_monster_search_response(
     return MonsterSearchResponse(content=MONSTER_SEARCH_EMPTY_MESSAGE)
 
 
-def get_monster_drop_search_response(
+async def get_monster_drop_search_response(
     query: str,
-    search_summaries: Callable[[str], list[MonsterSummary]] = search_monster_summaries,
-    get_detail: Callable[[str], MonsterDetail] = fetch_monster_detail,
+    search_summaries: Callable[[str], Awaitable[list[MonsterSummary]]] = search_monster_summaries,
+    get_detail: Callable[[str], Awaitable[MonsterDetail]] = fetch_monster_detail,
     candidate_limit: int = DEFAULT_MONSTER_CANDIDATE_DISPLAY_LIMIT,
     drop_limit: int = DEFAULT_MONSTER_DROP_DISPLAY_LIMIT,
 ) -> MonsterSearchResponse:
     """Return a Discord-ready monster drop search response."""
     try:
-        result = search_monster(query, search_summaries, get_detail)
+        result = await search_monster(query, search_summaries, get_detail)
     except MapleNoteCrawlerError:
         logger.error("Failed to search MapleNote monster drops.", exc_info=True)
         return MonsterSearchResponse(content=MONSTER_SEARCH_FAILURE_MESSAGE)
@@ -133,17 +133,17 @@ def get_monster_drop_search_response(
     return MonsterSearchResponse(content=MONSTER_SEARCH_EMPTY_MESSAGE)
 
 
-def search_monster(
+async def search_monster(
     query: str,
-    search_summaries: Callable[[str], list[MonsterSummary]] = search_monster_summaries,
-    get_detail: Callable[[str], MonsterDetail] = fetch_monster_detail,
+    search_summaries: Callable[[str], Awaitable[list[MonsterSummary]]] = search_monster_summaries,
+    get_detail: Callable[[str], Awaitable[MonsterDetail]] = fetch_monster_detail,
 ) -> MonsterSearchResult:
     """Search a monster and fetch detail when one best match is selected."""
     normalized_query = _normalize_name(query)
     if not normalized_query:
         return MonsterSearchResult(detail=None, candidates=[])
 
-    summaries = search_summaries(query)
+    summaries = await search_summaries(query)
     matching_summaries = [
         summary
         for summary in summaries
@@ -161,7 +161,7 @@ def search_monster(
 
     if selected_summary:
         return MonsterSearchResult(
-            detail=get_detail(selected_summary.detail_url),
+            detail=await get_detail(selected_summary.detail_url),
             candidates=[],
         )
 
