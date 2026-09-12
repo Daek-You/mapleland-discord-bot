@@ -1,3 +1,10 @@
+import asyncio
+import logging
+
+import discord
+
+import app.bot.client as client_module
+from app.bot.client import MapleLandDiscordClient
 from app.config import (
     DEFAULT_NOTICE_CHECK_INTERVAL_SECONDS,
     DEFAULT_NOTICE_DATABASE_PATH,
@@ -32,3 +39,80 @@ def test_get_notice_database_path_returns_default_for_empty_environment(
     monkeypatch.setenv(NOTICE_DATABASE_PATH_ENV_NAME, "")
 
     assert get_notice_database_path() == DEFAULT_NOTICE_DATABASE_PATH
+
+
+def test_notice_notification_loop_continues_after_unexpected_error(
+    monkeypatch,
+    caplog,
+) -> None:
+    class LoopHarness:
+        def __init__(self) -> None:
+            self.attempts = 0
+
+        async def wait_until_ready(self) -> None:
+            return None
+
+        def is_closed(self) -> bool:
+            return self.attempts >= 2
+
+        async def send_new_notice_notifications(self) -> None:
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("temporary failure")
+
+    async def skip_sleep(seconds: float) -> None:
+        return None
+
+    harness = LoopHarness()
+    monkeypatch.setattr(client_module.asyncio, "sleep", skip_sleep)
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(MapleLandDiscordClient._run_notice_notification_loop(harness))
+
+    assert harness.attempts == 2
+    assert "Unexpected error in notice notification loop." in caplog.text
+
+
+def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
+    class FakeTimerService:
+        def __init__(self) -> None:
+            self.cancelled = False
+
+        def cancel_all(self) -> None:
+            self.cancelled = True
+
+    async def scenario() -> None:
+        worker_finished = asyncio.Event()
+        discord_client_closed = False
+
+        async def worker() -> None:
+            try:
+                await asyncio.Future()
+            finally:
+                worker_finished.set()
+
+        async def fake_discord_close(self) -> None:
+            nonlocal discord_client_closed
+            discord_client_closed = True
+
+        monkeypatch.setattr(
+            client_module,
+            "create_default_notice_repository",
+            lambda: object(),
+        )
+        monkeypatch.setattr(discord.Client, "close", fake_discord_close)
+
+        client = MapleLandDiscordClient()
+        timer_service = FakeTimerService()
+        client.holy_symbol_timer_service = timer_service
+        client.notice_notification_task = asyncio.create_task(worker())
+        await asyncio.sleep(0)
+
+        await client.close()
+
+        assert worker_finished.is_set()
+        assert client.notice_notification_task is None
+        assert timer_service.cancelled is True
+        assert discord_client_closed is True
+
+    asyncio.run(scenario())

@@ -48,10 +48,6 @@ class MapleLandDiscordClient(discord.Client):
             self.command_tree,
             self.holy_symbol_timer_service,
         )
-        self.notice_notification_task = asyncio.create_task(
-            self._run_notice_notification_loop()
-        )
-
         guild_id = get_discord_guild_id()
         if guild_id:
             guild = discord.Object(id=int(guild_id))
@@ -61,25 +57,42 @@ class MapleLandDiscordClient(discord.Client):
             except discord.HTTPException:
                 logger.error("Failed to sync Discord guild commands.", exc_info=True)
                 raise
-            return
+        else:
+            try:
+                await self.command_tree.sync()
+            except discord.HTTPException:
+                logger.error("Failed to sync Discord global commands.", exc_info=True)
+                raise
 
-        try:
-            await self.command_tree.sync()
-        except discord.HTTPException:
-            logger.error("Failed to sync Discord global commands.", exc_info=True)
-            raise
+        self.notice_notification_task = asyncio.create_task(
+            self._run_notice_notification_loop(),
+            name="notice-notification-loop",
+        )
 
     async def close(self) -> None:
         """Stop background tasks before closing the Discord client."""
         if self.notice_notification_task:
             self.notice_notification_task.cancel()
+            await asyncio.gather(
+                self.notice_notification_task,
+                return_exceptions=True,
+            )
+            self.notice_notification_task = None
         self.holy_symbol_timer_service.cancel_all()
         await super().close()
 
     async def _run_notice_notification_loop(self) -> None:
         await self.wait_until_ready()
         while not self.is_closed():
-            await self.send_new_notice_notifications()
+            try:
+                await self.send_new_notice_notifications()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.error(
+                    "Unexpected error in notice notification loop.",
+                    exc_info=True,
+                )
             await asyncio.sleep(get_notice_check_interval_seconds())
 
     async def send_new_notice_notifications(self) -> None:
