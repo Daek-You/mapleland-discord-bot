@@ -1,15 +1,14 @@
 """Application entry point for the MapleLand Discord bot."""
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 
 from dotenv import load_dotenv
 
 from app.bot.client import MapleLandDiscordClient, create_discord_client
-from app.config import get_required_discord_token
+from app.config import get_required_discord_token, validate_runtime_config
 from app.logging_config import configure_logging
 from app.services.operational_notification_service import send_operational_notification
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +18,7 @@ def main(
 ) -> None:
     """Start the Discord bot."""
     load_dotenv()
+    validate_runtime_config()
     configure_logging()
     send_operational_notification("봇이 시작되는 중이에요.")
 

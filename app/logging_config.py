@@ -18,7 +18,6 @@ from app.config import (
     get_log_timezone,
 )
 
-
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 CONSOLE_LOG_LEVEL = logging.INFO

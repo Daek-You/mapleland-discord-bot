@@ -1,14 +1,21 @@
+import asyncio
+
 import httpx
 import pytest
 
 from app.crawler.mapleland import (
+    MAPLELAND_DEVLOG_LIST_URL,
+    MAPLELAND_EVENT_LIST_URL,
     MAPLELAND_NOTICE_LIST_URL,
     MaplelandCrawlerError,
     NoticeItem,
+    fetch_latest_devlog_items,
+    fetch_latest_event_items,
     fetch_latest_notice_items,
+    parse_devlog_items,
+    parse_event_items,
     parse_notice_items,
 )
-
 
 NOTICE_LIST_HTML = """
 <html>
@@ -19,6 +26,20 @@ NOTICE_LIST_HTML = """
     <a href="/board/events/event-id">이벤트 글은 제외됩니다</a>
   </body>
 </html>
+"""
+
+EVENT_LIST_HTML = """
+<html><body>
+  <a href="/board/events/first-event-id">First event N</a>
+  <a href="/board/notices/notice-id">Ignore notice</a>
+</body></html>
+"""
+
+DEVLOG_LIST_HTML = """
+<html><body>
+  <a href="/board/devlog/first-devlog-id">First development log</a>
+  <a href="/board/events/event-id">Ignore event</a>
+</body></html>
 """
 
 
@@ -43,9 +64,11 @@ class FakeClient:
         self.response = response
         self.request_error = request_error
         self.requested_url: str | None = None
+        self.requested_timeout: float | None = None
 
-    def get(self, url: str) -> FakeResponse:
+    async def get(self, url: str, *, timeout: float | None = None) -> FakeResponse:
         self.requested_url = url
+        self.requested_timeout = timeout
         if self.request_error:
             raise self.request_error
         if self.response is None:
@@ -77,17 +100,54 @@ def test_parse_notice_items_returns_empty_list_for_unexpected_html() -> None:
 def test_fetch_latest_notice_items_uses_client_and_parses_response() -> None:
     client = FakeClient(response=FakeResponse(NOTICE_LIST_HTML))
 
-    notice_items = fetch_latest_notice_items(client=client)
+    notice_items = asyncio.run(fetch_latest_notice_items(client=client))
 
     assert client.requested_url == MAPLELAND_NOTICE_LIST_URL
+    assert client.requested_timeout is not None
     assert len(notice_items) == 2
+
+
+def test_parse_event_items_returns_only_event_detail_links() -> None:
+    assert parse_event_items(EVENT_LIST_HTML) == [
+        NoticeItem(
+            title="First event",
+            url="https://maple.land/board/events/first-event-id",
+        )
+    ]
+
+
+def test_fetch_latest_event_items_uses_event_board_url() -> None:
+    client = FakeClient(response=FakeResponse(EVENT_LIST_HTML))
+
+    event_items = asyncio.run(fetch_latest_event_items(client=client))
+
+    assert client.requested_url == MAPLELAND_EVENT_LIST_URL
+    assert event_items[0].url == "https://maple.land/board/events/first-event-id"
+
+
+def test_parse_devlog_items_returns_only_devlog_detail_links() -> None:
+    assert parse_devlog_items(DEVLOG_LIST_HTML) == [
+        NoticeItem(
+            title="First development log",
+            url="https://maple.land/board/devlog/first-devlog-id",
+        )
+    ]
+
+
+def test_fetch_latest_devlog_items_uses_devlog_board_url() -> None:
+    client = FakeClient(response=FakeResponse(DEVLOG_LIST_HTML))
+
+    devlog_items = asyncio.run(fetch_latest_devlog_items(client=client))
+
+    assert client.requested_url == MAPLELAND_DEVLOG_LIST_URL
+    assert devlog_items[0].url == "https://maple.land/board/devlog/first-devlog-id"
 
 
 def test_fetch_latest_notice_items_wraps_http_error() -> None:
     client = FakeClient(response=FakeResponse("server error", status_code=500))
 
     with pytest.raises(MaplelandCrawlerError, match="HTTP error"):
-        fetch_latest_notice_items(client=client)
+        asyncio.run(fetch_latest_notice_items(client=client))
 
 
 def test_fetch_latest_notice_items_wraps_network_error() -> None:
@@ -95,4 +155,4 @@ def test_fetch_latest_notice_items_wraps_network_error() -> None:
     client = FakeClient(request_error=httpx.ConnectError("connection failed", request=request))
 
     with pytest.raises(MaplelandCrawlerError, match="request"):
-        fetch_latest_notice_items(client=client)
+        asyncio.run(fetch_latest_notice_items(client=client))

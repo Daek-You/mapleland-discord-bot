@@ -10,7 +10,9 @@
 ## 2. Testing Tool
 
 * pytest
-* Run pytest inside Docker with `docker compose run --rm app`
+* Ruff
+* Run pytest locally with uv for the normal development loop
+* Use Docker separately when deployment compatibility must be verified
 
 ---
 
@@ -39,20 +41,24 @@ Design → Test → Implement → Verify → Refactor → Test Again
 * Do NOT skip tests
 * Do NOT delete failing tests
 * Fix code, not tests
-* After feature development or bug fixes, run the full Docker test command
+* After feature development or bug fixes, run the full local test command
 
 ### Required Verification Command
 
 ```powershell
-docker compose run --rm app
+uv run --locked ruff check app tests
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
-This command runs `uv run pytest -p no:cacheprovider` in the container, using the same Python and dependencies as the Docker development environment.
+Ruff checks imports, common Python defects, and unsafe asynchronous patterns. The
+project `.python-version` selects Python 3.11, and `uv.lock` provides the same
+resolved dependency versions on local machines and in Docker. The `--locked` option
+fails instead of silently changing the lockfile.
 
 This verifies automated tests only. For Discord commands such as `/ping`, also run the bot with a real local `.env` token and confirm the command in a Discord test server.
 
 ```powershell
-docker compose run --rm app uv run python -m app.main
+uv run --locked python -m app.main
 ```
 
 ### Reporting Test Results
@@ -62,7 +68,7 @@ When reporting test results, include enough detail for reviewers to see which te
 Use verbose pytest output when a change adds or modifies tests:
 
 ```powershell
-docker compose run --rm app uv run pytest -v
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 The report should include:
@@ -93,7 +99,7 @@ def test_fetch_notices():
 
 ## Commit After Verification
 
-* Commit only after the required Docker test command passes
+* Commit only after the required local test command passes
 * Keep each commit focused on a small feature or fix
 
 ---

@@ -2,7 +2,6 @@
 
 from app.bot.command_config import SlashCommandConfig
 
-
 HOLY_SYMBOL_START_COMMAND = SlashCommandConfig(
     name="홀심시작",
     description="홀리심볼 타이머를 시작합니다.",

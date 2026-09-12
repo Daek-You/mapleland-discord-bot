@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from app.crawler.maplenote import (
@@ -10,10 +11,13 @@ from app.services.monster_service import (
     MONSTER_CANDIDATE_HEADER,
     MONSTER_SEARCH_EMPTY_MESSAGE,
     MONSTER_SEARCH_FAILURE_MESSAGE,
-    get_monster_drop_search_response,
-    get_monster_search_response,
 )
-
+from app.services.monster_service import (
+    get_monster_drop_search_response as get_monster_drop_search_response_async,
+)
+from app.services.monster_service import (
+    get_monster_search_response as get_monster_search_response_async,
+)
 
 SLIME_SUMMARY = MonsterSummary(
     name="슬라임",
@@ -63,6 +67,38 @@ SLIME_DETAIL = MonsterDetail(
     ],
     spawn_locations=["헤네시스 북쪽언덕", "파란버섯의 숲"],
 )
+
+
+def get_monster_search_response(query, search_summaries, get_detail):
+    async def async_search_summaries(search_query: str) -> list[MonsterSummary]:
+        return search_summaries(search_query)
+
+    async def async_get_detail(detail_url: str) -> MonsterDetail:
+        return get_detail(detail_url)
+
+    return asyncio.run(
+        get_monster_search_response_async(
+            query,
+            search_summaries=async_search_summaries,
+            get_detail=async_get_detail,
+        )
+    )
+
+
+def get_monster_drop_search_response(query, search_summaries, get_detail):
+    async def async_search_summaries(search_query: str) -> list[MonsterSummary]:
+        return search_summaries(search_query)
+
+    async def async_get_detail(detail_url: str) -> MonsterDetail:
+        return get_detail(detail_url)
+
+    return asyncio.run(
+        get_monster_drop_search_response_async(
+            query,
+            search_summaries=async_search_summaries,
+            get_detail=async_get_detail,
+        )
+    )
 
 
 def test_get_monster_search_response_selects_exact_match() -> None:

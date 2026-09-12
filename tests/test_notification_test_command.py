@@ -51,15 +51,19 @@ def test_register_notification_test_command_registers_command() -> None:
 def test_notification_test_command_sends_fake_notice(monkeypatch) -> None:
     command_tree = FakeCommandTree()
     interaction = FakeInteraction()
-    monkeypatch.setattr(
-        notification_test_command,
-        "collect_test_notice_notifications",
-        lambda unique_suffix: [
+
+    async def collect_test_notice_notifications(unique_suffix: str):
+        return [
             NoticeNotification(
                 title="Fake notice",
                 url=f"https://example.com/{unique_suffix}",
             )
-        ],
+        ]
+
+    monkeypatch.setattr(
+        notification_test_command,
+        "collect_test_notice_notifications",
+        collect_test_notice_notifications,
     )
 
     register_notification_test_command(command_tree)

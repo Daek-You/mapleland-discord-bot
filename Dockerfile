@@ -7,11 +7,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv \
+    && groupadd --system app \
+    && useradd --system --gid app --create-home app
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --dev
 
-COPY . .
+RUN uv sync --locked --no-dev
 
-CMD ["uv", "run", "python", "-m", "app.main"]
+COPY app ./app
+
+RUN chown -R app:app /app /opt/venv
+
+USER app
+
+CMD ["/opt/venv/bin/python", "-m", "app.main"]

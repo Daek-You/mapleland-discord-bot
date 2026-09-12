@@ -52,28 +52,32 @@ class MonsterDetail(MonsterSummary):
     spawn_locations: list[str] | None = None
 
 
-def search_monster_summaries(
+async def search_monster_summaries(
     query: str,
-    client: httpx.Client | None = None,
+    client: httpx.AsyncClient | None = None,
 ) -> list[MonsterSummary]:
     """Fetch and parse monster list results for a query."""
     if client is None:
-        with httpx.Client(timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS) as default_client:
-            return _search_monster_summaries_with_client(default_client, query)
+        async with httpx.AsyncClient(
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS
+        ) as default_client:
+            return await _search_monster_summaries_with_client(default_client, query)
 
-    return _search_monster_summaries_with_client(client, query)
+    return await _search_monster_summaries_with_client(client, query)
 
 
-def fetch_monster_detail(
+async def fetch_monster_detail(
     detail_url: str,
-    client: httpx.Client | None = None,
+    client: httpx.AsyncClient | None = None,
 ) -> MonsterDetail:
     """Fetch and parse one monster detail page."""
     if client is None:
-        with httpx.Client(timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS) as default_client:
-            return _fetch_monster_detail_with_client(default_client, detail_url)
+        async with httpx.AsyncClient(
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS
+        ) as default_client:
+            return await _fetch_monster_detail_with_client(default_client, detail_url)
 
-    return _fetch_monster_detail_with_client(client, detail_url)
+    return await _fetch_monster_detail_with_client(client, detail_url)
 
 
 def parse_monster_summaries(html: str, base_url: str = MAPLENOTE_BASE_URL) -> list[MonsterSummary]:
@@ -193,12 +197,16 @@ def parse_spawn_locations(html: str) -> list[str]:
     ]
 
 
-def _search_monster_summaries_with_client(
-    client: httpx.Client,
+async def _search_monster_summaries_with_client(
+    client: httpx.AsyncClient,
     query: str,
 ) -> list[MonsterSummary]:
     try:
-        response = client.get(MAPLENOTE_MONSTER_LIST_URL, params={"q": query})
+        response = await client.get(
+            MAPLENOTE_MONSTER_LIST_URL,
+            params={"q": query},
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MapleNoteCrawlerError("MapleNote monster search returned an HTTP error.") from error
@@ -208,13 +216,16 @@ def _search_monster_summaries_with_client(
     return parse_monster_summaries(response.text)
 
 
-def _fetch_monster_detail_with_client(
-    client: httpx.Client,
+async def _fetch_monster_detail_with_client(
+    client: httpx.AsyncClient,
     detail_url: str,
 ) -> MonsterDetail:
     request_url = _get_monster_detail_url(detail_url)
     try:
-        response = client.get(request_url)
+        response = await client.get(
+            request_url,
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MapleNoteCrawlerError("MapleNote monster detail returned an HTTP error.") from error

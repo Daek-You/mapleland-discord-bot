@@ -1,3 +1,6 @@
+import asyncio
+import threading
+
 from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem
 from app.db.notice_repository import NoticeRecord
 from app.services.notification_service import (
@@ -28,6 +31,10 @@ class FakeNoticeRepository:
         return bool(self.saved_notices)
 
 
+async def return_notice_items(notice_items: list[NoticeItem]) -> list[NoticeItem]:
+    return notice_items
+
+
 def test_collect_new_notice_notifications_detects_new_notices() -> None:
     repository = FakeNoticeRepository()
     repository.save_notice_if_new(
@@ -44,9 +51,11 @@ def test_collect_new_notice_notifications_detects_new_notices() -> None:
         )
     ]
 
-    notifications = collect_new_notice_notifications(
-        fetch_notice_items=lambda: notice_items,
-        notice_repository=repository,
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(notice_items),
+            notice_repository=repository,
+        )
     )
 
     assert len(notifications) == 1
@@ -68,13 +77,62 @@ def test_collect_new_notice_notifications_initializes_empty_repository_without_n
         ),
     ]
 
-    notifications = collect_new_notice_notifications(
-        fetch_notice_items=lambda: notice_items,
-        notice_repository=repository,
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(notice_items),
+            notice_repository=repository,
+        )
     )
 
     assert notifications == []
     assert [notice.external_id for notice in repository.saved_notices] == ["100", "101"]
+
+
+def test_collect_notice_notifications_suppresses_backlog_on_runtime_start() -> None:
+    repository = FakeNoticeRepository()
+    repository.save_notice_if_new(
+        NoticeRecord(
+            title="Old stored notice",
+            url="https://maple.land/board/notices/99",
+            external_id="99",
+        )
+    )
+
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(
+                [NoticeItem(title="Backlog", url="https://maple.land/board/notices/100")]
+            ),
+            notice_repository=repository,
+            suppress_current_notifications=True,
+        )
+    )
+
+    assert notifications == []
+
+
+def test_collect_notice_notifications_returns_oldest_first_for_chat_order() -> None:
+    repository = FakeNoticeRepository()
+    repository.save_notice_if_new(
+        NoticeRecord(
+            title="Stored notice",
+            url="https://maple.land/board/notices/99",
+            external_id="99",
+        )
+    )
+    newest_first_items = [
+        NoticeItem(title="Newest", url="https://maple.land/board/notices/102"),
+        NoticeItem(title="Older", url="https://maple.land/board/notices/101"),
+    ]
+
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(newest_first_items),
+            notice_repository=repository,
+        )
+    )
+
+    assert [notification.title for notification in notifications] == ["Older", "Newest"]
 
 
 def test_collect_new_notice_notifications_prevents_duplicate_by_url() -> None:
@@ -93,13 +151,17 @@ def test_collect_new_notice_notifications_prevents_duplicate_by_url() -> None:
         )
     ]
 
-    first_notifications = collect_new_notice_notifications(
-        fetch_notice_items=lambda: notice_items,
-        notice_repository=repository,
+    first_notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(notice_items),
+            notice_repository=repository,
+        )
     )
-    second_notifications = collect_new_notice_notifications(
-        fetch_notice_items=lambda: notice_items,
-        notice_repository=repository,
+    second_notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(notice_items),
+            notice_repository=repository,
+        )
     )
 
     assert len(first_notifications) == 1
@@ -116,23 +178,31 @@ def test_collect_new_notice_notifications_prevents_duplicate_by_external_id() ->
         )
     )
 
-    collect_new_notice_notifications(
-        fetch_notice_items=lambda: [
-            NoticeItem(
-                title="Original notice",
-                url="https://maple.land/board/notices/100",
-            )
-        ],
-        notice_repository=repository,
+    asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(
+                [
+                    NoticeItem(
+                        title="Original notice",
+                        url="https://maple.land/board/notices/100",
+                    )
+                ]
+            ),
+            notice_repository=repository,
+        )
     )
-    notifications = collect_new_notice_notifications(
-        fetch_notice_items=lambda: [
-            NoticeItem(
-                title="Same external id",
-                url="https://maple.land/board/notices/100/",
-            )
-        ],
-        notice_repository=repository,
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(
+                [
+                    NoticeItem(
+                        title="Same external id",
+                        url="https://maple.land/board/notices/100/",
+                    )
+                ]
+            ),
+            notice_repository=repository,
+        )
     )
 
     assert notifications == []
@@ -141,9 +211,11 @@ def test_collect_new_notice_notifications_prevents_duplicate_by_external_id() ->
 def test_collect_test_notice_notifications_uses_fake_notice_data() -> None:
     repository = FakeNoticeRepository()
 
-    notifications = collect_test_notice_notifications(
-        "test-run",
-        notice_repository=repository,
+    notifications = asyncio.run(
+        collect_test_notice_notifications(
+            "test-run",
+            notice_repository=repository,
+        )
     )
 
     assert len(notifications) == 1
@@ -152,23 +224,61 @@ def test_collect_test_notice_notifications_uses_fake_notice_data() -> None:
 
 
 def test_format_notice_notification_returns_title_and_url() -> None:
-    message = format_notice_notification(
+    notification = asyncio.run(
         collect_test_notice_notifications(
             "message-format",
             notice_repository=FakeNoticeRepository(),
-        )[0]
+        )
     )
+    message = format_notice_notification(notification[0])
 
     assert message == f"{TEST_NOTICE_TITLE}\n{TEST_NOTICE_URL}/message-format"
 
 
 def test_collect_new_notice_notifications_returns_empty_on_crawler_error() -> None:
-    def raise_crawler_error() -> list[NoticeItem]:
+    async def raise_crawler_error() -> list[NoticeItem]:
         raise MaplelandCrawlerError("failed")
 
-    notifications = collect_new_notice_notifications(
-        fetch_notice_items=raise_crawler_error,
-        notice_repository=FakeNoticeRepository(),
+    notifications = asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=raise_crawler_error,
+            notice_repository=FakeNoticeRepository(),
+        )
     )
 
     assert notifications == []
+
+
+def test_collect_new_notice_notifications_runs_repository_calls_in_worker_thread() -> None:
+    event_loop_thread_id = threading.get_ident()
+
+    class ThreadRecordingRepository(FakeNoticeRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.thread_ids: list[int] = []
+
+        def has_saved_notices(self) -> bool:
+            self.thread_ids.append(threading.get_ident())
+            return super().has_saved_notices()
+
+        def save_notice_if_new(self, notice: NoticeRecord) -> bool:
+            self.thread_ids.append(threading.get_ident())
+            return super().save_notice_if_new(notice)
+
+    repository = ThreadRecordingRepository()
+    notice_items = [
+        NoticeItem(
+            title="New notice",
+            url="https://maple.land/board/notices/100",
+        )
+    ]
+
+    asyncio.run(
+        collect_new_notice_notifications(
+            fetch_notice_items=lambda: return_notice_items(notice_items),
+            notice_repository=repository,
+        )
+    )
+
+    assert repository.thread_ids
+    assert all(thread_id != event_loop_thread_id for thread_id in repository.thread_ids)

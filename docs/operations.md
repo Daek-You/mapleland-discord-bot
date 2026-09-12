@@ -9,7 +9,6 @@ Development:
 ```text
 .env
 .env.example
-docker-compose.yml
 ```
 
 Production:
@@ -34,6 +33,7 @@ DISCORD_ALERT_WEBHOOK_URL=
 DISCORD_DEPLOY_WEBHOOK_URL=
 NOTICE_CHANNEL_ID=
 NOTICE_CHECK_INTERVAL_SECONDS=600
+DELIVERY_DISPATCH_INTERVAL_SECONDS=15
 NOTICE_DATABASE_PATH=data/notices.sqlite3
 LOG_LEVEL=INFO
 LOG_TIMEZONE=Asia/Seoul
@@ -41,19 +41,34 @@ LOG_TIMEZONE=Asia/Seoul
 
 ## Development Run
 
-Run tests with the development compose file:
+Run tests locally with uv. Docker Desktop is not required for the normal development
+loop:
 
 ```powershell
-docker compose run --rm app uv run pytest
+uv sync --locked
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 Run the bot locally after setting `.env`:
 
 ```powershell
-docker compose run --rm app uv run python -m app.main
+uv run --locked python -m app.main
 ```
 
-The default `docker-compose.yml` command stays test-focused for local development and CI.
+
+## SQLite Migrations and Backups
+
+The repository applies numbered SQL files from `app/db/migrations` when it opens the
+database. Applied versions are recorded in `schema_migrations`, so each migration runs
+only once.
+
+When an existing database has a pending migration, a consistent copy is created with
+SQLite's backup API before any schema change. By default, backups are stored next to
+the database under `backups/` with a UTC timestamp in the filename.
+
+To restore a backup, stop the bot first, preserve the failed database for diagnosis,
+copy the selected backup to `NOTICE_DATABASE_PATH`, and restart the bot. Never replace
+a live database file while the process is running.
 
 ## CI Runner
 
@@ -72,6 +87,9 @@ Install these on the production Windows PC:
 * Git
 * Docker Desktop
 * GitHub Actions self-hosted runner
+
+Keep the self-hosted GitHub Actions runner at version `2.327.1` or newer so Actions
+that use the Node.js 24 runtime, including `actions/checkout@v5`, can run correctly.
 
 Python and uv do not need to be installed on the Windows host. They run inside the Docker image.
 

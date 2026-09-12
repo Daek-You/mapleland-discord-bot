@@ -8,7 +8,6 @@ import httpx
 
 from app.config import get_app_env, get_bot_name, get_discord_alert_webhook_url
 
-
 logger = logging.getLogger(__name__)
 DEFAULT_NOTIFICATION_TIMEOUT_SECONDS = 5.0
 

@@ -3,6 +3,7 @@
 import logging
 import math
 import secrets
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord import app_commands
@@ -13,18 +14,29 @@ from app.config import (
     DEFAULT_MONSTER_DROP_PAGINATION_TIMEOUT_SECONDS,
     DEFAULT_MONSTER_EMBED_COLOR,
 )
-from app.crawler.maplenote import MonsterDropItem
+from app.crawler.maplenote import (
+    MonsterDetail,
+    MonsterDropItem,
+    MonsterSummary,
+    fetch_monster_detail,
+    search_monster_summaries,
+)
 from app.services.monster_service import (
     MonsterEmbedData,
     get_monster_drop_search_response,
     get_monster_search_response,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-def register_monster_command(command_tree: app_commands.CommandTree) -> None:
+def register_monster_command(
+    command_tree: app_commands.CommandTree,
+    search_summaries: Callable[
+        [str], Awaitable[list[MonsterSummary]]
+    ] = search_monster_summaries,
+    get_detail: Callable[[str], Awaitable[MonsterDetail]] = fetch_monster_detail,
+) -> None:
     """Register the /몬스터 command."""
 
     @command_tree.command(name=MONSTER_COMMAND.name, description=MONSTER_COMMAND.description)
@@ -33,15 +45,20 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
     async def monster(interaction: discord.Interaction, name: str) -> None:
         logger.info("/몬스터 command executed.")
         try:
-            response = get_monster_search_response(name)
+            await interaction.response.defer(thinking=True)
+            response = await get_monster_search_response(
+                name,
+                search_summaries=search_summaries,
+                get_detail=get_detail,
+            )
             if response.embed:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     content=response.content,
                     embed=_create_monster_embed(response.embed),
                 )
                 return
 
-            await interaction.response.send_message(response.content)
+            await interaction.followup.send(response.content)
         except discord.HTTPException:
             logger.error("Failed to send /몬스터 response.", exc_info=True)
             raise
@@ -58,7 +75,12 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
     async def monster_drop(interaction: discord.Interaction, name: str) -> None:
         logger.info("/몬스터드랍 command executed.")
         try:
-            response = get_monster_drop_search_response(name)
+            await interaction.response.defer(thinking=True)
+            response = await get_monster_drop_search_response(
+                name,
+                search_summaries=search_summaries,
+                get_detail=get_detail,
+            )
             if response.drop_items:
                 await send_monster_drop_result(
                     interaction,
@@ -69,7 +91,7 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
                 return
 
             if response.embeds:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     content=response.content,
                     embeds=[
                         _create_monster_embed(embed_data)
@@ -78,7 +100,7 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
                 )
                 return
 
-            await interaction.response.send_message(response.content)
+            await interaction.followup.send(response.content)
         except discord.HTTPException:
             logger.error("Failed to send /몬스터드랍 response.", exc_info=True)
             raise
@@ -166,13 +188,14 @@ async def send_monster_drop_result(
         content=content,
     )
     has_multiple_pages = view.total_pages > 1
-    await interaction.response.send_message(
+    message = await interaction.followup.send(
         content=view.active_content if has_multiple_pages else content,
         embeds=view.current_embeds,
         view=view if has_multiple_pages else None,
+        wait=True,
     )
     if has_multiple_pages:
-        view.message = await interaction.original_response()
+        view.message = message
 
 
 class MonsterDropPaginationView(discord.ui.View):

@@ -4,7 +4,6 @@ from app.services.holy_symbol_timer_service import (
     HolySymbolTimerService,
     format_holy_symbol_expired_message,
     format_holy_symbol_expired_tts_message,
-    format_remaining_time,
     format_holy_symbol_start_response,
     format_holy_symbol_status_response,
     format_holy_symbol_stop_response,
@@ -17,6 +16,7 @@ from app.services.holy_symbol_timer_service import (
     format_holy_symbol_tts_notice,
     format_holy_symbol_warning_message,
     format_holy_symbol_warning_tts_message,
+    format_remaining_time,
 )
 
 

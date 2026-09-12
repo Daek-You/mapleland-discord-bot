@@ -18,38 +18,49 @@
 1. Create branch from develop
 2. Implement feature
 3. Write tests
-4. Build the Docker image
-5. Run tests in Docker
+4. Run tests locally with uv
+5. Verify the Docker deployment image when deployment files change
 6. Open Pull Request
 7. Merge after review
 
-### Docker Development Workflow
+### Local Development Workflow
 
-Use Docker for local development so the project works even when Python is not installed on the host machine.
+Use uv for normal local development and testing. The project-level `.python-version`
+keeps the local Python minor version aligned with the Docker runtime, and uv manages
+the `.venv` directory automatically.
 
-Build the development image:
+The locked Windows environment includes the IANA time-zone data needed by
+`zoneinfo` for values such as `Asia/Seoul`; Linux containers use the operating
+system time-zone database.
+
+Install uv on Windows:
 
 ```powershell
-docker compose build app
+winget install --id astral-sh.uv -e
 ```
 
-Run the default test command:
+Open a new terminal after installation, then install the pinned Python version and
+locked project dependencies:
 
 ```powershell
-docker compose run --rm app
+uv python install
+uv sync --locked
 ```
 
-Run a specific command inside the container:
+Run the full test suite:
 
 ```powershell
-docker compose run --rm app uv run pytest
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 Run the Discord bot after setting `.env`:
 
 ```powershell
-docker compose run --rm app uv run python -m app.main
+uv run --locked python -m app.main
 ```
+
+Activating `.venv` manually is optional. `uv run` selects the project environment
+without activation.
 
 Production uses a separate compose file and environment file:
 
@@ -61,10 +72,13 @@ Use `.env` for local development and `.env.production` only on the production ho
 
 For local slash command testing, set `DISCORD_GUILD_ID` in `.env` so commands sync to one test server immediately.
 
-After changing dependencies in `pyproject.toml`, rebuild the image:
+After changing dependencies in `pyproject.toml`, refresh `uv.lock`, run local tests,
+and rebuild the deployment image:
 
 ```powershell
-docker compose build --no-cache app
+uv lock
+uv sync --locked
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 ---
@@ -113,10 +127,10 @@ fix: 중복 알림 방지
 
 ## 4.1 Commit Workflow
 
-After developing or modifying a feature, run the required Docker test command before committing:
+After developing or modifying a feature, run the required local test command before committing:
 
 ```powershell
-docker compose run --rm app
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 If the tests pass, create a commit for that small feature or fix.

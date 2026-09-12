@@ -9,4 +9,3 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    command: uv run python -m app.main

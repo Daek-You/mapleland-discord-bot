@@ -11,7 +11,6 @@ from app.services.notification_service import (
     format_notice_notification,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +24,7 @@ def register_notification_test_command(command_tree: app_commands.CommandTree) -
     async def notification_test(interaction: discord.Interaction) -> None:
         logger.info("/알림테스트 command executed.")
         try:
-            notifications = collect_test_notice_notifications(str(interaction.id))
+            notifications = await collect_test_notice_notifications(str(interaction.id))
             message = "\n\n".join(
                 format_notice_notification(notification) for notification in notifications
             )

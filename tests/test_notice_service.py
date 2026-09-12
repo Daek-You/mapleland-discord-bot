@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem
@@ -41,7 +42,10 @@ def test_get_latest_notice_message_limits_notices_to_five() -> None:
         for index in range(1, 7)
     ]
 
-    message = get_latest_notice_message(lambda: notice_items)
+    async def fetch_notice_items() -> list[NoticeItem]:
+        return notice_items
+
+    message = asyncio.run(get_latest_notice_message(fetch_notice_items))
 
     assert "5. [공지 5](https://maple.land/board/notices/5)" in message
     assert "공지 6" not in message
@@ -50,11 +54,11 @@ def test_get_latest_notice_message_limits_notices_to_five() -> None:
 def test_get_latest_notice_message_returns_failure_message_and_logs_exception(
     caplog,
 ) -> None:
-    def raise_crawler_error() -> list[NoticeItem]:
+    async def raise_crawler_error() -> list[NoticeItem]:
         raise MaplelandCrawlerError("crawler failed")
 
     with caplog.at_level(logging.ERROR):
-        message = get_latest_notice_message(raise_crawler_error)
+        message = asyncio.run(get_latest_notice_message(raise_crawler_error))
 
     assert message == NOTICE_COMMAND_FAILURE_MESSAGE
     assert "Failed to fetch Mapleland notices." in caplog.text

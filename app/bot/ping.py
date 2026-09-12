@@ -8,7 +8,6 @@ from discord import app_commands
 from app.bot.command_config import PING_COMMAND
 from app.services.ping_service import get_ping_response
 
-
 logger = logging.getLogger(__name__)
 
 
