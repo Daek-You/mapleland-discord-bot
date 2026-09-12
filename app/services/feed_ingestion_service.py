@@ -8,7 +8,11 @@ from hashlib import sha256
 from typing import Protocol
 from urllib.parse import urlparse
 
-from app.crawler.mapleland import MaplelandCrawlerError, NoticeItem, fetch_latest_notice_items
+from app.crawler.mapleland import (
+    MaplelandCrawlerError,
+    NoticeItem,
+    fetch_latest_notice_items,
+)
 from app.db.feed_repository import FeedChange, FeedItemRecord, FeedSaveResult
 from app.db.subscription_repository import FeedSubscription
 
@@ -99,21 +103,39 @@ async def collect_notice_feed_updates(
     delivery_repository: DeliveryRepository,
 ) -> list[FeedIngestionResult]:
     """Normalize official notices and queue updates after the initial baseline pass."""
+    return await collect_mapleland_board_feed_updates(
+        fetch_notice_items,
+        category="notice",
+        feed_repository=feed_repository,
+        subscription_repository=subscription_repository,
+        delivery_repository=delivery_repository,
+    )
+
+
+async def collect_mapleland_board_feed_updates(
+    fetch_board_items,
+    *,
+    category: str,
+    feed_repository: FeedRepository,
+    subscription_repository: SubscriptionRepository,
+    delivery_repository: DeliveryRepository,
+) -> list[FeedIngestionResult]:
+    """Normalize one official board and queue updates after its initial baseline pass."""
     try:
-        notice_items = await fetch_notice_items()
+        board_items = await fetch_board_items()
     except MaplelandCrawlerError:
         return []
 
     is_initialized = await asyncio.to_thread(
         feed_repository.has_items,
         source="mapleland",
-        category="notice",
+        category=category,
     )
     results: list[FeedIngestionResult] = []
-    for notice_item in notice_items:
+    for board_item in board_items:
         results.append(
             await ingest_feed_item(
-                _notice_item_to_feed_record(notice_item),
+                _board_item_to_feed_record(board_item, category=category),
                 feed_repository=feed_repository,
                 subscription_repository=subscription_repository,
                 delivery_repository=delivery_repository,
@@ -123,15 +145,15 @@ async def collect_notice_feed_updates(
     return results
 
 
-def _notice_item_to_feed_record(notice_item: NoticeItem) -> FeedItemRecord:
-    content = f"{notice_item.title}\n{notice_item.url}"
-    external_id = urlparse(notice_item.url).path.rstrip("/").split("/")[-1]
+def _board_item_to_feed_record(item: NoticeItem, *, category: str) -> FeedItemRecord:
+    content = f"{item.title}\n{item.url}"
+    external_id = urlparse(item.url).path.rstrip("/").split("/")[-1]
     return FeedItemRecord(
         source="mapleland",
-        category="notice",
-        external_id=external_id or notice_item.url,
-        url=notice_item.url,
-        title=notice_item.title,
+        category=category,
+        external_id=external_id or item.url,
+        url=item.url,
+        title=item.title,
         content_hash=sha256(content.encode()).hexdigest(),
         content=content,
     )

@@ -4,10 +4,16 @@ import httpx
 import pytest
 
 from app.crawler.mapleland import (
+    MAPLELAND_DEVLOG_LIST_URL,
+    MAPLELAND_EVENT_LIST_URL,
     MAPLELAND_NOTICE_LIST_URL,
     MaplelandCrawlerError,
     NoticeItem,
+    fetch_latest_devlog_items,
+    fetch_latest_event_items,
     fetch_latest_notice_items,
+    parse_devlog_items,
+    parse_event_items,
     parse_notice_items,
 )
 
@@ -20,6 +26,20 @@ NOTICE_LIST_HTML = """
     <a href="/board/events/event-id">이벤트 글은 제외됩니다</a>
   </body>
 </html>
+"""
+
+EVENT_LIST_HTML = """
+<html><body>
+  <a href="/board/events/first-event-id">First event N</a>
+  <a href="/board/notices/notice-id">Ignore notice</a>
+</body></html>
+"""
+
+DEVLOG_LIST_HTML = """
+<html><body>
+  <a href="/board/devlog/first-devlog-id">First development log</a>
+  <a href="/board/events/event-id">Ignore event</a>
+</body></html>
 """
 
 
@@ -85,6 +105,42 @@ def test_fetch_latest_notice_items_uses_client_and_parses_response() -> None:
     assert client.requested_url == MAPLELAND_NOTICE_LIST_URL
     assert client.requested_timeout is not None
     assert len(notice_items) == 2
+
+
+def test_parse_event_items_returns_only_event_detail_links() -> None:
+    assert parse_event_items(EVENT_LIST_HTML) == [
+        NoticeItem(
+            title="First event",
+            url="https://maple.land/board/events/first-event-id",
+        )
+    ]
+
+
+def test_fetch_latest_event_items_uses_event_board_url() -> None:
+    client = FakeClient(response=FakeResponse(EVENT_LIST_HTML))
+
+    event_items = asyncio.run(fetch_latest_event_items(client=client))
+
+    assert client.requested_url == MAPLELAND_EVENT_LIST_URL
+    assert event_items[0].url == "https://maple.land/board/events/first-event-id"
+
+
+def test_parse_devlog_items_returns_only_devlog_detail_links() -> None:
+    assert parse_devlog_items(DEVLOG_LIST_HTML) == [
+        NoticeItem(
+            title="First development log",
+            url="https://maple.land/board/devlog/first-devlog-id",
+        )
+    ]
+
+
+def test_fetch_latest_devlog_items_uses_devlog_board_url() -> None:
+    client = FakeClient(response=FakeResponse(DEVLOG_LIST_HTML))
+
+    devlog_items = asyncio.run(fetch_latest_devlog_items(client=client))
+
+    assert client.requested_url == MAPLELAND_DEVLOG_LIST_URL
+    assert devlog_items[0].url == "https://maple.land/board/devlog/first-devlog-id"
 
 
 def test_fetch_latest_notice_items_wraps_http_error() -> None:

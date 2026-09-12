@@ -22,6 +22,10 @@ DISCORD_ALERT_CHANNEL_ID_ENV_NAME = "DISCORD_ALERT_CHANNEL_ID"
 
 MAPLELAND_NOTICE_LIST_URL = "https://maple.land/board/notices"
 MAPLELAND_NOTICE_PATH_PREFIX = "/board/notices/"
+MAPLELAND_EVENT_LIST_URL = "https://maple.land/board/events"
+MAPLELAND_EVENT_PATH_PREFIX = "/board/events/"
+MAPLELAND_DEVLOG_LIST_URL = "https://maple.land/board/devlog"
+MAPLELAND_DEVLOG_PATH_PREFIX = "/board/devlog/"
 MAPLENOTE_BASE_URL = "https://xn--o80b01o9mlw3kdzc.com"
 MAPLENOTE_MONSTER_LIST_URL = f"{MAPLENOTE_BASE_URL}/monsters"
 

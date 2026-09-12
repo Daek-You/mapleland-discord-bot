@@ -6,6 +6,7 @@ from app.db.feed_repository import FeedChange, FeedItemRecord, FeedSaveResult
 from app.db.subscription_repository import FeedSubscription
 from app.services.feed_ingestion_service import (
     FeedIngestionResult,
+    collect_mapleland_board_feed_updates,
     collect_notice_feed_updates,
     ingest_feed_item,
 )
@@ -145,6 +146,30 @@ def test_collect_notice_feed_updates_queues_after_baseline() -> None:
             feed_repository=feed_repository,
             subscription_repository=FakeSubscriptionRepository(
                 [FeedSubscription(id=1, category="notice", channel_id="123", role_id=None)]
+            ),
+            delivery_repository=delivery_repository,
+        )
+    )
+
+    assert delivery_repository.enqueued == [(2, "123", None)]
+
+
+def test_collect_board_feed_updates_uses_its_own_category_baseline() -> None:
+    feed_repository = FakeFeedRepository(
+        FeedSaveResult(item_id=1, change=FeedChange.NEW, revision_id=2)
+    )
+    delivery_repository = FakeDeliveryRepository()
+
+    async def fetch_board_items():
+        return [NoticeItem(title="Event", url="https://maple.land/board/events/100")]
+
+    asyncio.run(
+        collect_mapleland_board_feed_updates(
+            fetch_board_items,
+            category="event",
+            feed_repository=feed_repository,
+            subscription_repository=FakeSubscriptionRepository(
+                [FeedSubscription(id=1, category="event", channel_id="123", role_id=None)]
             ),
             delivery_repository=delivery_repository,
         )

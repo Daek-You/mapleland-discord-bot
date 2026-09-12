@@ -19,7 +19,11 @@ from app.config import (
     get_notice_channel_id,
     get_notice_check_interval_seconds,
 )
-from app.crawler.mapleland import fetch_latest_notice_items
+from app.crawler.mapleland import (
+    fetch_latest_devlog_items,
+    fetch_latest_event_items,
+    fetch_latest_notice_items,
+)
 from app.crawler.maplenote import fetch_monster_detail, search_monster_summaries
 from app.db.delivery_repository import DeliveryRecord, create_default_delivery_repository
 from app.db.feed_repository import create_default_feed_repository
@@ -27,7 +31,7 @@ from app.db.notice_repository import create_default_notice_repository
 from app.db.subscription_repository import create_default_subscription_repository
 from app.http_client import create_shared_http_client
 from app.services.delivery_service import PermanentDeliveryError, dispatch_ready_deliveries
-from app.services.feed_ingestion_service import collect_notice_feed_updates
+from app.services.feed_ingestion_service import collect_mapleland_board_feed_updates
 from app.services.holy_symbol_timer_service import HolySymbolTimerService
 from app.services.notification_service import (
     collect_new_notice_notifications,
@@ -79,6 +83,10 @@ class MapleLandDiscordClient(discord.Client):
             self.command_tree,
             self.holy_symbol_timer_service,
         )
+        register_feed_subscription_commands(
+            self.command_tree,
+            self.subscription_repository,
+        )
         guild_id = get_discord_guild_id()
         if guild_id:
             guild = discord.Object(id=int(guild_id))
@@ -98,10 +106,6 @@ class MapleLandDiscordClient(discord.Client):
         self.notice_notification_task = asyncio.create_task(
             self._run_notice_notification_loop(),
             name="notice-notification-loop",
-        )
-        register_feed_subscription_commands(
-            self.command_tree,
-            self.subscription_repository,
         )
         self.delivery_dispatch_task = asyncio.create_task(
             self._run_delivery_dispatch_loop(),
@@ -148,7 +152,7 @@ class MapleLandDiscordClient(discord.Client):
 
     async def send_new_notice_notifications(self) -> None:
         """Send newly detected notice notifications to the configured channel."""
-        await self.collect_latest_feed_notices()
+        await self.collect_latest_feed_updates()
         channel_id = get_notice_channel_id()
         if not channel_id:
             logger.info("NOTICE_CHANNEL_ID is not set. Skipping notice notification.")
@@ -175,13 +179,18 @@ class MapleLandDiscordClient(discord.Client):
             except discord.HTTPException:
                 logger.error("Failed to send notice notification.", exc_info=True)
 
-    async def collect_latest_feed_notices(self) -> None:
-        """Collect official notices into the normalized feed and delivery queue."""
-        await collect_notice_feed_updates(
-            fetch_notice_items=partial(
-                fetch_latest_notice_items,
-                client=self.http_client,
-            ),
+    async def collect_latest_feed_updates(self) -> None:
+        """Collect official boards into the normalized feed and delivery queue."""
+        await asyncio.gather(
+            self._collect_mapleland_board_feed("notice", fetch_latest_notice_items),
+            self._collect_mapleland_board_feed("event", fetch_latest_event_items),
+            self._collect_mapleland_board_feed("devlog", fetch_latest_devlog_items),
+        )
+
+    async def _collect_mapleland_board_feed(self, category: str, fetch_board_items) -> None:
+        await collect_mapleland_board_feed_updates(
+            partial(fetch_board_items, client=self.http_client),
+            category=category,
             feed_repository=self.feed_repository,
             subscription_repository=self.subscription_repository,
             delivery_repository=self.delivery_repository,
