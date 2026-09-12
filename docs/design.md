@@ -108,7 +108,6 @@ mapleland-discord-bot/
 │
 ├─ migrations/
 ├─ Dockerfile
-├─ docker-compose.yml
 ├─ alembic.ini
 ├─ pyproject.toml
 └─ .env.example

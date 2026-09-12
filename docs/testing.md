@@ -61,13 +61,6 @@ This verifies automated tests only. For Discord commands such as `/ping`, also r
 uv run --locked python -m app.main
 ```
 
-When deployment files or dependencies change, also verify the Docker image:
-
-```powershell
-docker compose build app
-docker compose run --rm app uv run pytest -p no:cacheprovider -v
-```
-
 ### Reporting Test Results
 
 When reporting test results, include enough detail for reviewers to see which tests passed.

@@ -10,7 +10,7 @@ def test_ci_workflow_runs_tests_on_github_hosted_runner() -> None:
 
     assert "ubuntu-latest" in workflow
     assert "uv run ruff check app tests" in workflow
-    assert "docker compose run --rm app uv run pytest -v" in workflow
+    assert "uv run pytest -v" in workflow
 
 
 def test_deploy_workflow_uses_production_self_hosted_windows_runner() -> None:

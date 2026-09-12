@@ -1,7 +1,6 @@
 services:
   app:
     build: .
-    target: runtime
     restart: unless-stopped
     env_file:
       - .env.production

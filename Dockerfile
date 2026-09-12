@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,16 +12,6 @@ RUN pip install --no-cache-dir uv \
     && useradd --system --gid app --create-home app
 
 COPY pyproject.toml uv.lock ./
-
-FROM base AS development
-
-RUN uv sync --locked --dev
-
-COPY . .
-
-CMD ["uv", "run", "python", "-m", "app.main"]
-
-FROM base AS runtime
 
 RUN uv sync --locked --no-dev
 

@@ -9,7 +9,6 @@ Development:
 ```text
 .env
 .env.example
-docker-compose.yml
 ```
 
 Production:
@@ -56,8 +55,6 @@ Run the bot locally after setting `.env`:
 uv run --locked python -m app.main
 ```
 
-The default `docker-compose.yml` command remains available for deployment-image
-verification, while production continues to use `docker-compose.prod.yml`.
 
 ## SQLite Migrations and Backups
 

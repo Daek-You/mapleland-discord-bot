@@ -62,21 +62,6 @@ uv run --locked python -m app.main
 Activating `.venv` manually is optional. `uv run` selects the project environment
 without activation.
 
-### Docker Deployment Verification
-
-Docker is still the production runtime. Build the image when `Dockerfile`, Compose
-files, dependencies, or deployment scripts change:
-
-```powershell
-docker compose build app
-```
-
-Optionally run the tests in the image when verifying deployment compatibility:
-
-```powershell
-docker compose run --rm app uv run pytest -p no:cacheprovider -v
-```
-
 Production uses a separate compose file and environment file:
 
 ```powershell
@@ -94,7 +79,6 @@ and rebuild the deployment image:
 uv lock
 uv sync --locked
 uv run --locked pytest -p no:cacheprovider -v
-docker compose build --no-cache app
 ```
 
 ---

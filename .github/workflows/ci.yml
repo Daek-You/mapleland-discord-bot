@@ -9,18 +9,29 @@ on:
 
 jobs:
   test:
-    name: Docker tests
+    name: Tests and ARM64 image build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install locked development dependencies
+        run: uv sync --locked --dev
+
       - name: Run Ruff
-        run: docker compose run --rm app uv run ruff check app tests
+        run: uv run ruff check app tests
 
       - name: Run tests
-        run: docker compose run --rm app uv run pytest -v
+        run: uv run pytest -v
 
       - name: Build production image for ARM64
         run: >-
