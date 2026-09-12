@@ -1,18 +1,23 @@
 """Discord slash command registration for Mapleland notices."""
 
 import logging
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord import app_commands
 
 from app.bot.command_config import NOTICE_COMMAND
+from app.crawler.mapleland import NoticeItem, fetch_latest_notice_items
 from app.services.notice_service import get_latest_notice_message
 
 
 logger = logging.getLogger(__name__)
 
 
-def register_notice_command(command_tree: app_commands.CommandTree) -> None:
+def register_notice_command(
+    command_tree: app_commands.CommandTree,
+    fetch_notice_items: Callable[[], Awaitable[list[NoticeItem]]] = fetch_latest_notice_items,
+) -> None:
     """Register the /공지 command."""
 
     @command_tree.command(name=NOTICE_COMMAND.name, description=NOTICE_COMMAND.description)
@@ -20,7 +25,9 @@ def register_notice_command(command_tree: app_commands.CommandTree) -> None:
         logger.info("/공지 command executed.")
         try:
             await interaction.response.defer(thinking=True)
-            await interaction.followup.send(await get_latest_notice_message())
+            await interaction.followup.send(
+                await get_latest_notice_message(fetch_notice_items=fetch_notice_items)
+            )
         except discord.HTTPException:
             logger.error("Failed to send /공지 response.", exc_info=True)
             raise

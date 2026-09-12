@@ -145,10 +145,18 @@ class FakeClient:
         self.request_error = request_error
         self.requested_url: str | None = None
         self.requested_params: dict[str, str] | None = None
+        self.requested_timeout: float | None = None
 
-    async def get(self, url: str, params: dict[str, str] | None = None) -> FakeResponse:
+    async def get(
+        self,
+        url: str,
+        params: dict[str, str] | None = None,
+        *,
+        timeout: float | None = None,
+    ) -> FakeResponse:
         self.requested_url = url
         self.requested_params = params
+        self.requested_timeout = timeout
         if self.request_error:
             raise self.request_error
         if self.response is None:
@@ -260,6 +268,7 @@ def test_search_monster_summaries_uses_query_param() -> None:
 
     assert client.requested_url == MAPLENOTE_MONSTER_LIST_URL
     assert client.requested_params == {"q": "슬라임"}
+    assert client.requested_timeout is not None
     assert summaries[0].name == "슬라임"
 
 
@@ -286,6 +295,7 @@ def test_fetch_monster_detail_requests_full_detail_page_from_card_url() -> None:
         client.requested_url
         == "https://xn--o80b01o9mlw3kdzc.com/monster_detail/210100?from=card"
     )
+    assert client.requested_timeout is not None
 
 
 def test_search_monster_summaries_wraps_network_error() -> None:

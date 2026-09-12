@@ -75,7 +75,10 @@ async def _fetch_latest_notice_items_with_client(
     notice_list_url: str,
 ) -> list[NoticeItem]:
     try:
-        response = await client.get(notice_list_url)
+        response = await client.get(
+            notice_list_url,
+            timeout=DEFAULT_MAPLELAND_REQUEST_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MaplelandCrawlerError("Mapleland notice page returned an HTTP error.") from error

@@ -45,9 +45,11 @@ class FakeClient:
         self.response = response
         self.request_error = request_error
         self.requested_url: str | None = None
+        self.requested_timeout: float | None = None
 
-    async def get(self, url: str) -> FakeResponse:
+    async def get(self, url: str, *, timeout: float | None = None) -> FakeResponse:
         self.requested_url = url
+        self.requested_timeout = timeout
         if self.request_error:
             raise self.request_error
         if self.response is None:
@@ -82,6 +84,7 @@ def test_fetch_latest_notice_items_uses_client_and_parses_response() -> None:
     notice_items = asyncio.run(fetch_latest_notice_items(client=client))
 
     assert client.requested_url == MAPLELAND_NOTICE_LIST_URL
+    assert client.requested_timeout is not None
     assert len(notice_items) == 2
 
 

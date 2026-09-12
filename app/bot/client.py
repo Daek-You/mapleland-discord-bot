@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from functools import partial
 
 import discord
 from discord import app_commands
@@ -16,12 +17,15 @@ from app.config import (
     get_notice_channel_id,
     get_notice_check_interval_seconds,
 )
+from app.crawler.mapleland import fetch_latest_notice_items
+from app.crawler.maplenote import fetch_monster_detail, search_monster_summaries
 from app.db.notice_repository import create_default_notice_repository
+from app.http_client import create_shared_http_client
+from app.services.holy_symbol_timer_service import HolySymbolTimerService
 from app.services.notification_service import (
     collect_new_notice_notifications,
     format_notice_notification,
 )
-from app.services.holy_symbol_timer_service import HolySymbolTimerService
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +37,7 @@ class MapleLandDiscordClient(discord.Client):
     def __init__(self) -> None:
         super().__init__(intents=discord.Intents.default())
         self.command_tree = app_commands.CommandTree(self)
+        self.http_client = create_shared_http_client()
         self.notice_repository = create_default_notice_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
         self.holy_symbol_timer_service = HolySymbolTimerService()
@@ -40,9 +45,25 @@ class MapleLandDiscordClient(discord.Client):
     async def setup_hook(self) -> None:
         """Register and sync slash commands."""
         logger.info("Registering Discord slash commands.")
-        register_monster_command(self.command_tree)
+        register_monster_command(
+            self.command_tree,
+            search_summaries=partial(
+                search_monster_summaries,
+                client=self.http_client,
+            ),
+            get_detail=partial(
+                fetch_monster_detail,
+                client=self.http_client,
+            ),
+        )
         register_notification_test_command(self.command_tree)
-        register_notice_command(self.command_tree)
+        register_notice_command(
+            self.command_tree,
+            fetch_notice_items=partial(
+                fetch_latest_notice_items,
+                client=self.http_client,
+            ),
+        )
         register_ping_command(self.command_tree)
         register_holy_symbol_commands(
             self.command_tree,
@@ -71,15 +92,20 @@ class MapleLandDiscordClient(discord.Client):
 
     async def close(self) -> None:
         """Stop background tasks before closing the Discord client."""
-        if self.notice_notification_task:
-            self.notice_notification_task.cancel()
-            await asyncio.gather(
-                self.notice_notification_task,
-                return_exceptions=True,
-            )
-            self.notice_notification_task = None
-        self.holy_symbol_timer_service.cancel_all()
-        await super().close()
+        try:
+            if self.notice_notification_task:
+                self.notice_notification_task.cancel()
+                await asyncio.gather(
+                    self.notice_notification_task,
+                    return_exceptions=True,
+                )
+                self.notice_notification_task = None
+            self.holy_symbol_timer_service.cancel_all()
+        finally:
+            try:
+                await self.http_client.aclose()
+            finally:
+                await super().close()
 
     async def _run_notice_notification_loop(self) -> None:
         await self.wait_until_ready()
@@ -111,6 +137,10 @@ class MapleLandDiscordClient(discord.Client):
             return
 
         notifications = await collect_new_notice_notifications(
+            fetch_notice_items=partial(
+                fetch_latest_notice_items,
+                client=self.http_client,
+            ),
             notice_repository=self.notice_repository,
         )
         for notification in notifications:

@@ -3,6 +3,7 @@
 import logging
 import math
 import secrets
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord import app_commands
@@ -13,7 +14,13 @@ from app.config import (
     DEFAULT_MONSTER_DROP_PAGINATION_TIMEOUT_SECONDS,
     DEFAULT_MONSTER_EMBED_COLOR,
 )
-from app.crawler.maplenote import MonsterDropItem
+from app.crawler.maplenote import (
+    MonsterDetail,
+    MonsterDropItem,
+    MonsterSummary,
+    fetch_monster_detail,
+    search_monster_summaries,
+)
 from app.services.monster_service import (
     MonsterEmbedData,
     get_monster_drop_search_response,
@@ -24,7 +31,13 @@ from app.services.monster_service import (
 logger = logging.getLogger(__name__)
 
 
-def register_monster_command(command_tree: app_commands.CommandTree) -> None:
+def register_monster_command(
+    command_tree: app_commands.CommandTree,
+    search_summaries: Callable[
+        [str], Awaitable[list[MonsterSummary]]
+    ] = search_monster_summaries,
+    get_detail: Callable[[str], Awaitable[MonsterDetail]] = fetch_monster_detail,
+) -> None:
     """Register the /몬스터 command."""
 
     @command_tree.command(name=MONSTER_COMMAND.name, description=MONSTER_COMMAND.description)
@@ -34,7 +47,11 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
         logger.info("/몬스터 command executed.")
         try:
             await interaction.response.defer(thinking=True)
-            response = await get_monster_search_response(name)
+            response = await get_monster_search_response(
+                name,
+                search_summaries=search_summaries,
+                get_detail=get_detail,
+            )
             if response.embed:
                 await interaction.followup.send(
                     content=response.content,
@@ -60,7 +77,11 @@ def register_monster_command(command_tree: app_commands.CommandTree) -> None:
         logger.info("/몬스터드랍 command executed.")
         try:
             await interaction.response.defer(thinking=True)
-            response = await get_monster_drop_search_response(name)
+            response = await get_monster_drop_search_response(
+                name,
+                search_summaries=search_summaries,
+                get_detail=get_detail,
+            )
             if response.drop_items:
                 await send_monster_drop_result(
                     interaction,

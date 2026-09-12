@@ -55,7 +55,7 @@ def test_notice_command_sends_latest_notice_message(monkeypatch) -> None:
     command_tree = FakeCommandTree()
     interaction = FakeInteraction()
 
-    async def get_latest_notice_message() -> str:
+    async def get_latest_notice_message(**kwargs) -> str:
         return "공지 응답"
 
     monkeypatch.setattr(notice_command, "get_latest_notice_message", get_latest_notice_message)
@@ -65,3 +65,19 @@ def test_notice_command_sends_latest_notice_message(monkeypatch) -> None:
 
     assert interaction.response.deferred is True
     assert interaction.followup.message == "공지 응답"
+
+
+def test_notice_command_uses_injected_fetcher() -> None:
+    command_tree = FakeCommandTree()
+    interaction = FakeInteraction()
+
+    async def fetch_notice_items():
+        return []
+
+    register_notice_command(
+        command_tree,
+        fetch_notice_items=fetch_notice_items,
+    )
+    asyncio.run(command_tree.commands[NOTICE_COMMAND.name]["callback"](interaction))
+
+    assert interaction.followup.message == "현재 가져올 수 있는 공지가 없습니다."

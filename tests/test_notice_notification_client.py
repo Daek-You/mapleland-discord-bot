@@ -81,6 +81,13 @@ def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
         def cancel_all(self) -> None:
             self.cancelled = True
 
+    class FakeHttpClient:
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def aclose(self) -> None:
+            self.closed = True
+
     async def scenario() -> None:
         worker_finished = asyncio.Event()
         discord_client_closed = False
@@ -100,6 +107,12 @@ def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
             "create_default_notice_repository",
             lambda: object(),
         )
+        http_client = FakeHttpClient()
+        monkeypatch.setattr(
+            client_module,
+            "create_shared_http_client",
+            lambda: http_client,
+        )
         monkeypatch.setattr(discord.Client, "close", fake_discord_close)
 
         client = MapleLandDiscordClient()
@@ -113,6 +126,36 @@ def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
         assert worker_finished.is_set()
         assert client.notice_notification_task is None
         assert timer_service.cancelled is True
+        assert http_client.closed is True
         assert discord_client_closed is True
 
     asyncio.run(scenario())
+
+
+def test_notice_notification_uses_shared_http_client(monkeypatch) -> None:
+    shared_http_client = object()
+    captured_fetcher = None
+
+    class LoopHarness:
+        http_client = shared_http_client
+        notice_repository = object()
+
+        def get_channel(self, channel_id: int):
+            return object()
+
+    async def collect_notifications(**kwargs):
+        nonlocal captured_fetcher
+        captured_fetcher = kwargs["fetch_notice_items"]
+        return []
+
+    monkeypatch.setattr(client_module, "get_notice_channel_id", lambda: "123")
+    monkeypatch.setattr(
+        client_module,
+        "collect_new_notice_notifications",
+        collect_notifications,
+    )
+
+    asyncio.run(MapleLandDiscordClient.send_new_notice_notifications(LoopHarness()))
+
+    assert captured_fetcher is not None
+    assert captured_fetcher.keywords["client"] is shared_http_client

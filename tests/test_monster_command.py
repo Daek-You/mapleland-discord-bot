@@ -7,7 +7,7 @@ import pytest
 import app.bot.monster as monster_command
 from app.bot.command_config import MONSTER_COMMAND, MONSTER_DROP_COMMAND
 from app.bot.monster import register_monster_command
-from app.crawler.maplenote import MonsterDropItem
+from app.crawler.maplenote import MonsterDetail, MonsterDropItem, MonsterSummary
 from app.services.monster_service import (
     MonsterEmbedData,
     MonsterEmbedField,
@@ -92,7 +92,7 @@ class FakeCommandTree:
 
 
 def make_async_response(factory):
-    async def get_response(name: str) -> MonsterSearchResponse:
+    async def get_response(name: str, **kwargs) -> MonsterSearchResponse:
         return factory(name)
 
     return get_response
@@ -110,6 +110,44 @@ def test_register_monster_command_registers_command() -> None:
         command_tree.commands[MONSTER_DROP_COMMAND.name]["description"]
         == MONSTER_DROP_COMMAND.description
     )
+
+
+def test_monster_command_uses_injected_crawlers() -> None:
+    command_tree = FakeCommandTree()
+    interaction = FakeInteraction()
+    searched_queries: list[str] = []
+    fetched_urls: list[str] = []
+    summary = MonsterSummary(
+        name="슬라임",
+        level="6",
+        hp="50",
+        mp="35",
+        exp="10",
+        element="-",
+        detail_url="https://example.com/monster_card/210100",
+    )
+    detail = MonsterDetail(**summary.__dict__, spawn_locations=[])
+
+    async def search_summaries(query: str) -> list[MonsterSummary]:
+        searched_queries.append(query)
+        return [summary]
+
+    async def get_detail(detail_url: str) -> MonsterDetail:
+        fetched_urls.append(detail_url)
+        return detail
+
+    register_monster_command(
+        command_tree,
+        search_summaries=search_summaries,
+        get_detail=get_detail,
+    )
+    asyncio.run(
+        command_tree.commands[MONSTER_COMMAND.name]["callback"](interaction, "슬라임")
+    )
+
+    assert searched_queries == ["슬라임"]
+    assert fetched_urls == [summary.detail_url]
+    assert interaction.followup.embed.title == "슬라임"
 
 
 def test_monster_command_sends_search_message(monkeypatch) -> None:

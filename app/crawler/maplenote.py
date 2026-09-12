@@ -202,7 +202,11 @@ async def _search_monster_summaries_with_client(
     query: str,
 ) -> list[MonsterSummary]:
     try:
-        response = await client.get(MAPLENOTE_MONSTER_LIST_URL, params={"q": query})
+        response = await client.get(
+            MAPLENOTE_MONSTER_LIST_URL,
+            params={"q": query},
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MapleNoteCrawlerError("MapleNote monster search returned an HTTP error.") from error
@@ -218,7 +222,10 @@ async def _fetch_monster_detail_with_client(
 ) -> MonsterDetail:
     request_url = _get_monster_detail_url(detail_url)
     try:
-        response = await client.get(request_url)
+        response = await client.get(
+            request_url,
+            timeout=DEFAULT_MAPLENOTE_REQUEST_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
     except httpx.HTTPStatusError as error:
         raise MapleNoteCrawlerError("MapleNote monster detail returned an HTTP error.") from error
