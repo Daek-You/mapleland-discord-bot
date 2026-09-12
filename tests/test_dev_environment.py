@@ -37,7 +37,9 @@ def test_docker_configuration_uses_python_311_slim_and_uv() -> None:
 
     assert "FROM python:3.11-slim" in dockerfile
     assert "UV_PROJECT_ENVIRONMENT=/opt/venv" in dockerfile
-    assert "uv sync --dev" in dockerfile
+    assert "uv sync --locked --dev" in dockerfile
+    assert "uv sync --locked --no-dev" in dockerfile
+    assert "USER app" in dockerfile
     assert "uv run pytest" in compose_file
     assert "APP_ENV" in compose_file
     assert "BOT_NAME" in compose_file
@@ -47,4 +49,4 @@ def test_docker_configuration_uses_python_311_slim_and_uv() -> None:
     assert "NOTICE_DATABASE_PATH" in compose_file
     assert "restart: unless-stopped" in production_compose_file
     assert ".env.production" in production_compose_file
-    assert "uv run python -m app.main" in production_compose_file
+    assert "target: runtime" in production_compose_file

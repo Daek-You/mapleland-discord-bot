@@ -21,3 +21,8 @@ jobs:
 
       - name: Run tests
         run: docker compose run --rm app uv run pytest -v
+
+      - name: Build production image for ARM64
+        run: >-
+          docker buildx build --platform linux/arm64
+          --provenance=false --output type=oci,dest=/tmp/mapleland-discord-bot-arm64.tar .
