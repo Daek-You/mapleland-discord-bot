@@ -372,7 +372,7 @@ Python 버전 변경은 기능 리뉴얼과 한 커밋에 섞지 않는다. 먼�
 | 목적 | 선택 |
 |---|---|
 | 이미지 | Docker, `python:3.13-slim` 계열의 고정된 minor/digest |
-| 로컬 실행 | Docker Compose |
+| 로컬 실행 | uv + 프로젝트 가상환경(`.venv`) |
 | 이미지 저장 | 공개 저장소라면 GHCR 공개 패키지 우선 검토 |
 | 운영 서버 | OCI Always Free Ampere A1 VM 우선 |
 | 영속 데이터 | OCI Block Volume의 호스트 디렉터리를 컨테이너에 마운트 |
@@ -695,4 +695,3 @@ main 병합
 - [Docker Compose 서비스 설정](https://docs.docker.com/reference/compose-file/services/)
 - [GitHub Actions self-hosted runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
 - [Dependabot 버전 업데이트](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configuring-dependabot-version-updates)
-

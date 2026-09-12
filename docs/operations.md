@@ -41,19 +41,22 @@ LOG_TIMEZONE=Asia/Seoul
 
 ## Development Run
 
-Run tests with the development compose file:
+Run tests locally with uv. Docker Desktop is not required for the normal development
+loop:
 
 ```powershell
-docker compose run --rm app uv run pytest
+uv sync --locked
+uv run --locked pytest -p no:cacheprovider -v
 ```
 
 Run the bot locally after setting `.env`:
 
 ```powershell
-docker compose run --rm app uv run python -m app.main
+uv run --locked python -m app.main
 ```
 
-The default `docker-compose.yml` command stays test-focused for local development and CI.
+The default `docker-compose.yml` command remains available for deployment-image
+verification, while production continues to use `docker-compose.prod.yml`.
 
 ## CI Runner
 

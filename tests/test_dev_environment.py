@@ -13,6 +13,14 @@ def test_pyproject_includes_pytest() -> None:
     assert any(dependency.startswith("pytest") for dependency in dev_dependencies)
 
 
+def test_local_python_version_matches_docker_runtime() -> None:
+    python_version = (PROJECT_ROOT / ".python-version").read_text().strip()
+    dockerfile = (PROJECT_ROOT / "Dockerfile").read_text()
+
+    assert python_version == "3.11"
+    assert f"FROM python:{python_version}-slim" in dockerfile
+
+
 def test_docker_configuration_uses_python_311_slim_and_uv() -> None:
     dockerfile = (PROJECT_ROOT / "Dockerfile").read_text()
     compose_file = (PROJECT_ROOT / "docker-compose.yml").read_text()
