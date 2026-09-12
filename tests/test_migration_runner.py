@@ -10,7 +10,7 @@ def test_apply_migrations_creates_schema_and_records_version(tmp_path) -> None:
 
     applied_versions = apply_migrations(database_path)
 
-    assert applied_versions == [1]
+    assert applied_versions == [1, 2]
     with sqlite3.connect(database_path) as connection:
         tables = {
             row[0]
@@ -22,14 +22,16 @@ def test_apply_migrations_creates_schema_and_records_version(tmp_path) -> None:
             "SELECT version, name FROM schema_migrations"
         ).fetchall()
     assert "notices" in tables
-    assert versions == [(1, "create_notices")]
+    assert "feed_items" in tables
+    assert "feed_revisions" in tables
+    assert versions == [(1, "create_notices"), (2, "create_feed_tables")]
 
 
 def test_apply_migrations_is_idempotent_and_does_not_create_extra_backup(tmp_path) -> None:
     database_path = tmp_path / "notices.sqlite3"
     backup_directory = tmp_path / "backups"
 
-    assert apply_migrations(database_path, backup_directory=backup_directory) == [1]
+    assert apply_migrations(database_path, backup_directory=backup_directory) == [1, 2]
     assert apply_migrations(database_path, backup_directory=backup_directory) == []
 
     assert list(backup_directory.glob("*.sqlite3")) == []
@@ -43,7 +45,7 @@ def test_apply_migrations_backs_up_legacy_database_before_schema_change(tmp_path
         connection.execute("INSERT INTO legacy_data (value) VALUES ('keep-me')")
         connection.commit()
 
-    assert apply_migrations(database_path, backup_directory=backup_directory) == [1]
+    assert apply_migrations(database_path, backup_directory=backup_directory) == [1, 2]
 
     backup_files = list(backup_directory.glob("*.sqlite3"))
     assert len(backup_files) == 1
