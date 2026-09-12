@@ -13,6 +13,7 @@ from app.config import (
     get_notice_check_interval_seconds,
     get_notice_database_path,
 )
+from app.db.delivery_repository import DeliveryRecord, DeliveryStatus
 
 TEST_NOTICE_CHECK_INTERVAL_SECONDS = 30
 
@@ -106,6 +107,11 @@ def test_close_waits_for_notice_notification_task(monkeypatch) -> None:
             "create_default_notice_repository",
             lambda: object(),
         )
+        monkeypatch.setattr(
+            client_module,
+            "create_default_delivery_repository",
+            lambda: object(),
+        )
         http_client = FakeHttpClient()
         monkeypatch.setattr(
             client_module,
@@ -158,3 +164,51 @@ def test_notice_notification_uses_shared_http_client(monkeypatch) -> None:
 
     assert captured_fetcher is not None
     assert captured_fetcher.keywords["client"] is shared_http_client
+
+
+def test_feed_delivery_dispatch_loop_continues_after_unexpected_error(monkeypatch, caplog) -> None:
+    class LoopHarness:
+        def __init__(self) -> None:
+            self.attempts = 0
+
+        async def wait_until_ready(self) -> None:
+            return None
+
+        def is_closed(self) -> bool:
+            return self.attempts >= 2
+
+        async def send_pending_feed_deliveries(self) -> None:
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("temporary failure")
+
+    async def skip_sleep(seconds: float) -> None:
+        return None
+
+    harness = LoopHarness()
+    monkeypatch.setattr(client_module.asyncio, "sleep", skip_sleep)
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(MapleLandDiscordClient._run_delivery_dispatch_loop(harness))
+
+    assert harness.attempts == 2
+    assert "Unexpected error in feed delivery dispatch loop." in caplog.text
+
+
+def test_format_feed_delivery_includes_optional_role_mention() -> None:
+    delivery = DeliveryRecord(
+        id=1,
+        feed_revision_id=2,
+        channel_id="123",
+        category="notice",
+        title="Patch note",
+        url="https://maple.land/board/notices/100",
+        content="content",
+        role_id="456",
+        attempt_count=1,
+        status=DeliveryStatus.PROCESSING,
+    )
+
+    message = client_module._format_feed_delivery(delivery)
+
+    assert message == "<@&456>\n**[notice] Patch note**\nhttps://maple.land/board/notices/100"

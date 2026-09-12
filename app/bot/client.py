@@ -13,14 +13,17 @@ from app.bot.notice import register_notice_command
 from app.bot.notification_test import register_notification_test_command
 from app.bot.ping import register_ping_command
 from app.config import (
+    get_delivery_dispatch_interval_seconds,
     get_discord_guild_id,
     get_notice_channel_id,
     get_notice_check_interval_seconds,
 )
 from app.crawler.mapleland import fetch_latest_notice_items
 from app.crawler.maplenote import fetch_monster_detail, search_monster_summaries
+from app.db.delivery_repository import DeliveryRecord, create_default_delivery_repository
 from app.db.notice_repository import create_default_notice_repository
 from app.http_client import create_shared_http_client
+from app.services.delivery_service import PermanentDeliveryError, dispatch_ready_deliveries
 from app.services.holy_symbol_timer_service import HolySymbolTimerService
 from app.services.notification_service import (
     collect_new_notice_notifications,
@@ -38,7 +41,9 @@ class MapleLandDiscordClient(discord.Client):
         self.command_tree = app_commands.CommandTree(self)
         self.http_client = create_shared_http_client()
         self.notice_repository = create_default_notice_repository()
+        self.delivery_repository = create_default_delivery_repository()
         self.notice_notification_task: asyncio.Task[None] | None = None
+        self.delivery_dispatch_task: asyncio.Task[None] | None = None
         self.holy_symbol_timer_service = HolySymbolTimerService()
 
     async def setup_hook(self) -> None:
@@ -88,6 +93,10 @@ class MapleLandDiscordClient(discord.Client):
             self._run_notice_notification_loop(),
             name="notice-notification-loop",
         )
+        self.delivery_dispatch_task = asyncio.create_task(
+            self._run_delivery_dispatch_loop(),
+            name="feed-delivery-dispatch-loop",
+        )
 
     async def close(self) -> None:
         """Stop background tasks before closing the Discord client."""
@@ -99,6 +108,13 @@ class MapleLandDiscordClient(discord.Client):
                     return_exceptions=True,
                 )
                 self.notice_notification_task = None
+            if self.delivery_dispatch_task:
+                self.delivery_dispatch_task.cancel()
+                await asyncio.gather(
+                    self.delivery_dispatch_task,
+                    return_exceptions=True,
+                )
+                self.delivery_dispatch_task = None
             self.holy_symbol_timer_service.cancel_all()
         finally:
             try:
@@ -148,7 +164,47 @@ class MapleLandDiscordClient(discord.Client):
             except discord.HTTPException:
                 logger.error("Failed to send notice notification.", exc_info=True)
 
+    async def _run_delivery_dispatch_loop(self) -> None:
+        """Dispatch queued feed revisions after the client becomes ready."""
+        await self.wait_until_ready()
+        while not self.is_closed():
+            try:
+                await self.send_pending_feed_deliveries()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.error("Unexpected error in feed delivery dispatch loop.", exc_info=True)
+            await asyncio.sleep(get_delivery_dispatch_interval_seconds())
+
+    async def send_pending_feed_deliveries(self) -> None:
+        """Send one queued delivery batch and record its outcome."""
+        await dispatch_ready_deliveries(
+            self.delivery_repository,
+            self._send_feed_delivery_to_discord,
+        )
+
+    async def _send_feed_delivery_to_discord(self, delivery: DeliveryRecord) -> str:
+        """Send one queued revision to its configured Discord channel."""
+        try:
+            channel = self.get_channel(int(delivery.channel_id))
+            if channel is None:
+                channel = await self.fetch_channel(int(delivery.channel_id))
+            if not isinstance(channel, discord.abc.Messageable):
+                raise PermanentDeliveryError("channel_not_messageable")
+            message = await channel.send(_format_feed_delivery(delivery))
+        except discord.NotFound as error:
+            raise PermanentDeliveryError("channel_not_found") from error
+        except discord.Forbidden as error:
+            raise PermanentDeliveryError("channel_forbidden") from error
+        return str(message.id)
+
 
 def create_discord_client() -> MapleLandDiscordClient:
     """Create the Discord client."""
     return MapleLandDiscordClient()
+
+
+def _format_feed_delivery(delivery: DeliveryRecord) -> str:
+    """Format a revision notification with an optional configured role mention."""
+    role_mention = f"<@&{delivery.role_id}>\n" if delivery.role_id else ""
+    return f"{role_mention}**[{delivery.category}] {delivery.title}**\n{delivery.url}"

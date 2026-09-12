@@ -38,6 +38,24 @@ def test_enqueue_is_idempotent_per_revision_and_channel(tmp_path) -> None:
     assert another_channel is True
 
 
+def test_claim_ready_delivery_includes_revision_content_and_role(tmp_path) -> None:
+    database_path = tmp_path / "delivery.sqlite3"
+    revision_id = make_revision_id(database_path)
+    repository = SqliteDeliveryRepository(str(database_path))
+    repository.enqueue(revision_id, "123", role_id="456")
+    now = datetime(2030, 9, 12, 10, 0, tzinfo=UTC)
+
+    delivery = repository.claim_ready(now, limit=10, lease_duration=timedelta(minutes=5))[0]
+
+    assert (delivery.category, delivery.title, delivery.url, delivery.content, delivery.role_id) == (
+        "notice",
+        "notice",
+        "https://maple.land/board/notices/100",
+        "content",
+        "456",
+    )
+
+
 def test_claim_ready_delivery_marks_processing_and_increments_attempt_count(tmp_path) -> None:
     database_path = tmp_path / "delivery.sqlite3"
     revision_id = make_revision_id(database_path)

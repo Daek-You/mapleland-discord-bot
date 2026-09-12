@@ -27,6 +27,11 @@ class DeliveryRecord:
     id: int
     feed_revision_id: int
     channel_id: str
+    category: str
+    title: str
+    url: str
+    content: str
+    role_id: str | None
     attempt_count: int
     status: DeliveryStatus
 
@@ -38,17 +43,23 @@ class SqliteDeliveryRepository:
         self.database_path = database_path
         apply_migrations(database_path)
 
-    def enqueue(self, feed_revision_id: int, channel_id: str) -> bool:
+    def enqueue(
+        self,
+        feed_revision_id: int,
+        channel_id: str,
+        *,
+        role_id: str | None = None,
+    ) -> bool:
         """Create one delivery per revision and channel, returning False for duplicates."""
         with self._connect() as connection:
             cursor = connection.execute(
                 """
                 INSERT OR IGNORE INTO deliveries (
-                    feed_revision_id, channel_id, next_attempt_at
+                    feed_revision_id, channel_id, role_id, next_attempt_at
                 )
-                VALUES (?, ?, ?)
+                VALUES (?, ?, ?, ?)
                 """,
-                (feed_revision_id, channel_id, _to_storage(datetime.now(UTC))),
+                (feed_revision_id, channel_id, role_id, _to_storage(datetime.now(UTC))),
             )
             connection.commit()
             return cursor.rowcount == 1
@@ -72,11 +83,15 @@ class SqliteDeliveryRepository:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
-                SELECT id, feed_revision_id, channel_id, attempt_count
+                SELECT deliveries.id, deliveries.feed_revision_id, deliveries.channel_id,
+                       feed_items.category, feed_items.title, feed_items.url,
+                       feed_revisions.content, deliveries.role_id, deliveries.attempt_count
                 FROM deliveries
-                WHERE (status = ? AND next_attempt_at <= ?)
-                   OR (status = ? AND lease_expires_at <= ?)
-                ORDER BY next_attempt_at, id
+                INNER JOIN feed_revisions ON feed_revisions.id = deliveries.feed_revision_id
+                INNER JOIN feed_items ON feed_items.id = feed_revisions.feed_item_id
+                WHERE (deliveries.status = ? AND deliveries.next_attempt_at <= ?)
+                   OR (deliveries.status = ? AND deliveries.lease_expires_at <= ?)
+                ORDER BY deliveries.next_attempt_at, deliveries.id
                 LIMIT ?
                 """,
                 (
@@ -110,7 +125,12 @@ class SqliteDeliveryRepository:
                 id=row[0],
                 feed_revision_id=row[1],
                 channel_id=row[2],
-                attempt_count=row[3] + 1,
+                category=row[3],
+                title=row[4],
+                url=row[5],
+                content=row[6],
+                role_id=row[7],
+                attempt_count=row[8] + 1,
                 status=DeliveryStatus.PROCESSING,
             )
             for row in rows
@@ -202,3 +222,8 @@ def _to_storage(value: datetime) -> str:
     if value.tzinfo is None:
         raise ValueError("datetime must include a timezone")
     return value.astimezone(UTC).isoformat(timespec="microseconds")
+
+
+def create_default_delivery_repository() -> SqliteDeliveryRepository:
+    """Create the configured delivery repository."""
+    return SqliteDeliveryRepository()

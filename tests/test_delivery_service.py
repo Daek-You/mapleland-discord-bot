@@ -34,6 +34,11 @@ def make_delivery(attempt_count: int = 1) -> DeliveryRecord:
         id=1,
         feed_revision_id=2,
         channel_id="123",
+        category="notice",
+        title="Notice",
+        url="https://maple.land/board/notices/100",
+        content="Content",
+        role_id=None,
         attempt_count=attempt_count,
         status=DeliveryStatus.PROCESSING,
     )

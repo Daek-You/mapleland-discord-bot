@@ -11,6 +11,7 @@ DISCORD_TOKEN_ENV_NAME = "DISCORD_TOKEN"
 DISCORD_GUILD_ID_ENV_NAME = "DISCORD_GUILD_ID"
 NOTICE_CHANNEL_ID_ENV_NAME = "NOTICE_CHANNEL_ID"
 NOTICE_CHECK_INTERVAL_SECONDS_ENV_NAME = "NOTICE_CHECK_INTERVAL_SECONDS"
+DELIVERY_DISPATCH_INTERVAL_SECONDS_ENV_NAME = "DELIVERY_DISPATCH_INTERVAL_SECONDS"
 NOTICE_DATABASE_PATH_ENV_NAME = "NOTICE_DATABASE_PATH"
 LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
 LOG_TIMEZONE_ENV_NAME = "LOG_TIMEZONE"
@@ -39,6 +40,7 @@ DEFAULT_HOLY_SYMBOL_WARNING_BEFORE_EXPIRATION_SECONDS = 10
 DEFAULT_HOLY_SYMBOL_THREAD_NAME_FORMAT = "{username}-홀심"
 DEFAULT_HOLY_SYMBOL_THREAD_DELETE_DELAY_SECONDS = 10
 DEFAULT_NOTICE_CHECK_INTERVAL_SECONDS = 600
+DEFAULT_DELIVERY_DISPATCH_INTERVAL_SECONDS = 15
 DEFAULT_NOTICE_DATABASE_PATH = "data/notices.sqlite3"
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_LOG_TIMEZONE = "Asia/Seoul"
@@ -89,6 +91,14 @@ def get_notice_check_interval_seconds() -> int:
     return interval
 
 
+def get_delivery_dispatch_interval_seconds() -> int:
+    """Return delivery queue poll interval from the environment."""
+    return _get_positive_integer_setting(
+        DELIVERY_DISPATCH_INTERVAL_SECONDS_ENV_NAME,
+        DEFAULT_DELIVERY_DISPATCH_INTERVAL_SECONDS,
+    )
+
+
 def get_notice_database_path() -> str:
     """Return the notice database path."""
     return os.getenv(NOTICE_DATABASE_PATH_ENV_NAME) or DEFAULT_NOTICE_DATABASE_PATH
@@ -134,6 +144,7 @@ def validate_runtime_config() -> None:
     get_required_discord_token()
     get_app_env()
     get_notice_check_interval_seconds()
+    get_delivery_dispatch_interval_seconds()
 
     for environment_name in (
         DISCORD_GUILD_ID_ENV_NAME,
@@ -168,3 +179,16 @@ def _validate_optional_discord_id(environment_name: str) -> None:
         raise RuntimeError(f"{environment_name} must be a positive integer.") from error
     if value <= 0:
         raise RuntimeError(f"{environment_name} must be a positive integer.")
+
+
+def _get_positive_integer_setting(environment_name: str, default: int) -> int:
+    raw_value = os.getenv(environment_name)
+    if not raw_value:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise RuntimeError(f"{environment_name} must be a positive integer.") from error
+    if value <= 0:
+        raise RuntimeError(f"{environment_name} must be a positive integer.")
+    return value
